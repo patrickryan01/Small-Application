@@ -59,7 +59,7 @@ class OPCUAServer:
         
     def signal_handler(self, sig, frame):
         """Handle shutdown signals gracefully."""
-        self.logger. info("Shutdown signal received...")
+        self.logger.info("Shutdown signal received...")
         self.running = False
         
     def load_tag_config(self):
@@ -106,12 +106,12 @@ class OPCUAServer:
                 "description": "Ambient temperature sensor"
             },
             "Pressure": {
-                "type":  "float",
-                "initial_value": 101. 3,
+                "type": "float",
+                "initial_value": 101.3,
                 "simulate": True,
                 "simulation_type": "random",
                 "min": 99.0,
-                "max":  103.0,
+                "max": 103.0,
                 "description": "System pressure in kPa"
             },
             "Counter": {
@@ -216,10 +216,10 @@ class OPCUAServer:
                     "type": tag_type
                 }
                 
-                self. logger.debug(f"Created tag: {tag_name} ({tag_type}) = {initial_value}")
+                self.logger.debug(f"Created tag: {tag_name} ({tag_type}) = {initial_value}")
                 
             except Exception as e:
-                self.logger.error(f"Error creating tag {tag_name}:  {e}")
+                self.logger.error(f"Error creating tag {tag_name}: {e}")
         
         self.logger.info(f"OPC UA Server configured with {len(self.tags)} tags")
         return idx
@@ -242,7 +242,7 @@ class OPCUAServer:
                 if sim_type == "random":
                     new_value = self.generate_random_value(config, tag_type)
                     var.set_value(new_value)
-                    self.logger.debug(f"{tag_name}:  {current_value} -> {new_value}")
+                    self.logger.debug(f"{tag_name}: {current_value} -> {new_value}")
                     
                 elif sim_type == "increment":
                     new_value = self.generate_increment_value(current_value, config, tag_type)
@@ -292,7 +292,7 @@ class OPCUAServer:
         Returns:
             Incremented value
         """
-        increment = config. get("increment", 1)
+        increment = config.get("increment", 1)
         max_val = config.get("max", None)
         reset_on_max = config.get("reset_on_max", False)
         
@@ -303,7 +303,7 @@ class OPCUAServer:
             if reset_on_max:
                 new_value = config.get("min", 0)
         
-        if tag_type == "int": 
+        if tag_type == "int":
             return int(new_value)
         else:
             return float(new_value)
@@ -329,7 +329,7 @@ class OPCUAServer:
         t = time.time()
         value = offset + amplitude * math.sin(2 * math.pi * t / period)
         
-        if tag_type == "int": 
+        if tag_type == "int":
             return int(value)
         else:
             return round(value, 2)
@@ -348,7 +348,7 @@ class OPCUAServer:
             tag_type = tag_data["type"]
             simulate = tag_data["config"].get("simulate", False)
             sim_type = tag_data["config"].get("simulation_type", "static") if simulate else "static"
-            print(f"    • {tag_name: 20s} ({tag_type: 6s}) - {sim_type}")
+            print(f"    • {tag_name:20s} ({tag_type:6s}) - {sim_type}")
         print("="*60)
         print("  Press Ctrl+C to stop")
         print("="*60 + "\n")
@@ -384,9 +384,9 @@ class OPCUAServer:
             try:
                 self.server.stop()
                 self.logger.info("Server stopped successfully")
-            except Exception as e: 
+            except Exception as e:
                 self.logger.error(f"Error during shutdown: {e}")
-        print("\nServer stopped.  Goodbye!\n")
+        print("\nServer stopped. Goodbye!\n")
 
 
 def main():
@@ -396,7 +396,7 @@ def main():
     parser = argparse.ArgumentParser(description='OPC UA Server for Ignition Edge')
     parser.add_argument(
         '-c', '--config',
-        default='tags_config. json',
+        default='tags_config.json',
         help='Path to tags configuration file (default: tags_config.json)'
     )
     parser.add_argument(
