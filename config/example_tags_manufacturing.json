@@ -2,14 +2,14 @@
   "LineSpeed": {
     "type": "float",
     "initial_value": 100.0,
-    "simulate":  true,
+    "simulate": true,
     "simulation_type": "random",
     "min": 95.0,
-    "max":  105.0,
+    "max": 105.0,
     "description": "Production line speed in units/min"
   },
   "UnitsProduced": {
-    "type":  "int",
+    "type": "int",
     "initial_value": 0,
     "simulate": true,
     "simulation_type": "increment",
@@ -37,25 +37,25 @@
     "description": "Rejected units this shift"
   },
   "LineStatus": {
-    "type":  "string",
+    "type": "string",
     "initial_value": "Running",
     "simulate": false,
     "description": "Production line status"
   },
   "MotorRunning": {
-    "type":  "bool",
+    "type": "bool",
     "initial_value": true,
     "simulate": false,
-    "description":  "Main motor running status"
+    "description": "Main motor running status"
   },
   "MotorCurrent": {
-    "type":  "float",
+    "type": "float",
     "initial_value": 15.5,
     "simulate": true,
-    "simulation_type":  "random",
-    "min":  14.0,
-    "max":  17.0,
-    "description":  "Motor current in Amps"
+    "simulation_type": "random",
+    "min": 14.0,
+    "max": 17.0,
+    "description": "Motor current in Amps"
   },
   "Efficiency": {
     "type": "float",
@@ -64,6 +64,6 @@
     "simulation_type": "random",
     "min": 80.0,
     "max": 95.0,
-    "description":  "Line efficiency percentage"
+    "description": "Line efficiency percentage"
   }
 }
