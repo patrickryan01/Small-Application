@@ -1,0 +1,30 @@
+[Unit]
+Description=OPC UA Server for Ignition Edge
+Documentation=
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/opcua-server
+ExecStart=/usr/bin/python3 /opt/opcua-server/opcua_server.py
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment="UPDATE_INTERVAL=2"
+Environment="OPC_ENDPOINT=opc.tcp://0.0.0.0:4840/freeopcua/server/"
+Environment="OPC_SERVER_NAME=Python OPC UA Server"
+Environment="OPC_DEVICE_NAME=EdgeDevice"
+
+# Security hardening (optional)
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=opcua-server
+
+[Install]
+WantedBy=multi-user.target
