@@ -1620,6 +1620,13 @@ class PublisherManager:
             self.publishers.append(modbus_pub)
             self.logger.info("MODBUS TCP publisher initialized")
         
+        # GraphQL API Publisher
+        graphql_config = publishers_config.get("graphql", {})
+        if graphql_config.get("enabled", False):
+            graphql_pub = GraphQLPublisher(graphql_config, self.logger)
+            self.publishers.append(graphql_pub)
+            self.logger.info("GraphQL API publisher initialized")
+        
         # OPC UA Client Publisher
         opcua_client_config = publishers_config.get("opcua_client", {})
         if opcua_client_config.get("enabled", False):
