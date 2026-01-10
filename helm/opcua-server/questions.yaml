@@ -1,0 +1,278 @@
+# Rancher Questions for OPC UA Server
+# This creates the nice UI forms in Rancher
+# Patrick Ryan - "Making YAML bearable since 2026"
+
+categories:
+  - IoT
+  - Industrial
+  - Monitoring
+
+questions:
+# Image Configuration
+- variable: image.repository
+  default: "your-registry.com/opcua-server"
+  description: "Docker image repository (update with your registry)"
+  type: string
+  required: true
+  label: Container Image Repository
+  group: "Container Settings"
+
+- variable: image.tag
+  default: "1.0.0"
+  description: "Image tag to deploy"
+  type: string
+  required: true
+  label: Image Tag
+  group: "Container Settings"
+
+- variable: image.pullPolicy
+  default: "IfNotPresent"
+  description: "Image pull policy"
+  type: enum
+  label: Pull Policy
+  group: "Container Settings"
+  options:
+    - "IfNotPresent"
+    - "Always"
+    - "Never"
+
+# OPC UA Configuration
+- variable: opcua.updateInterval
+  default: 2.0
+  description: "Tag update interval in seconds"
+  type: float
+  required: true
+  label: Update Interval (seconds)
+  group: "OPC UA Settings"
+
+- variable: opcua.logLevel
+  default: "INFO"
+  description: "Logging level"
+  type: enum
+  label: Log Level
+  group: "OPC UA Settings"
+  options:
+    - "DEBUG"
+    - "INFO"
+    - "WARNING"
+    - "ERROR"
+
+# Service Configuration
+- variable: service.type
+  default: "ClusterIP"
+  description: "Kubernetes service type"
+  type: enum
+  label: Service Type
+  group: "Networking"
+  options:
+    - "ClusterIP"
+    - "NodePort"
+    - "LoadBalancer"
+
+- variable: service.opcua.port
+  default: 4840
+  description: "OPC UA server port"
+  type: int
+  label: OPC UA Port
+  group: "Networking"
+
+- variable: service.rest.port
+  default: 5000
+  description: "REST API / Web UI port"
+  type: int
+  label: Web UI Port
+  group: "Networking"
+
+# Ingress Configuration
+- variable: ingress.enabled
+  default: false
+  description: "Enable ingress for external web access"
+  type: boolean
+  label: Enable Ingress
+  group: "Networking"
+  show_subquestion_if: true
+  subquestions:
+  - variable: ingress.className
+    default: "nginx"
+    description: "Ingress class name"
+    type: string
+    label: Ingress Class
+  - variable: ingress.hosts[0].host
+    default: "opcua.local"
+    description: "Hostname for web UI access"
+    type: hostname
+    label: Ingress Hostname
+  - variable: ingress.tls[0].secretName
+    default: "opcua-tls"
+    description: "TLS secret name (cert-manager)"
+    type: string
+    label: TLS Secret Name
+
+# Resource Limits
+- variable: resources.requests.cpu
+  default: "100m"
+  description: "CPU request"
+  type: string
+  label: CPU Request
+  group: "Resources"
+
+- variable: resources.requests.memory
+  default: "256Mi"
+  description: "Memory request"
+  type: string
+  label: Memory Request
+  group: "Resources"
+
+- variable: resources.limits.cpu
+  default: "1000m"
+  description: "CPU limit"
+  type: string
+  label: CPU Limit
+  group: "Resources"
+
+- variable: resources.limits.memory
+  default: "1Gi"
+  description: "Memory limit"
+  type: string
+  label: Memory Limit
+  group: "Resources"
+
+# Persistence
+- variable: persistence.enabled
+  default: true
+  description: "Enable persistent storage for SQLite database"
+  type: boolean
+  label: Enable Persistence
+  group: "Storage"
+  show_subquestion_if: true
+  subquestions:
+  - variable: persistence.size
+    default: "10Gi"
+    description: "Persistent volume size"
+    type: string
+    label: Storage Size
+  - variable: persistence.storageClass
+    default: ""
+    description: "Storage class (leave empty for default)"
+    type: storageclass
+    label: Storage Class
+  - variable: persistence.accessMode
+    default: "ReadWriteOnce"
+    description: "Access mode"
+    type: enum
+    label: Access Mode
+    options:
+      - "ReadWriteOnce"
+      - "ReadWriteMany"
+
+# Monitoring
+- variable: serviceMonitor.enabled
+  default: false
+  description: "Enable Prometheus ServiceMonitor (requires prometheus-operator)"
+  type: boolean
+  label: Enable Prometheus Monitoring
+  group: "Monitoring"
+  show_subquestion_if: true
+  subquestions:
+  - variable: serviceMonitor.interval
+    default: "30s"
+    description: "Scrape interval"
+    type: string
+    label: Scrape Interval
+
+# Publishers Configuration
+- variable: mqtt.enabled
+  default: false
+  description: "Enable MQTT publisher"
+  type: boolean
+  label: Enable MQTT
+  group: "Publishers"
+  show_subquestion_if: true
+  subquestions:
+  - variable: mqtt.broker
+    default: "mosquitto.default.svc.cluster.local"
+    description: "MQTT broker address"
+    type: string
+    label: MQTT Broker
+  - variable: mqtt.port
+    default: 1883
+    description: "MQTT broker port"
+    type: int
+    label: MQTT Port
+  - variable: mqtt.topicPrefix
+    default: "industrial/opcua"
+    description: "MQTT topic prefix"
+    type: string
+    label: Topic Prefix
+
+- variable: influxdb.enabled
+  default: false
+  description: "Enable InfluxDB publisher"
+  type: boolean
+  label: Enable InfluxDB
+  group: "Publishers"
+  show_subquestion_if: true
+  subquestions:
+  - variable: influxdb.url
+    default: "http://influxdb.default.svc.cluster.local:8086"
+    description: "InfluxDB URL"
+    type: string
+    label: InfluxDB URL
+  - variable: influxdb.org
+    default: "default"
+    description: "InfluxDB organization"
+    type: string
+    label: Organization
+  - variable: influxdb.bucket
+    default: "sensors"
+    description: "InfluxDB bucket name"
+    type: string
+    label: Bucket Name
+
+# Multi-tenancy
+- variable: multitenancy.enabled
+  default: false
+  description: "Enable multi-tenancy mode"
+  type: boolean
+  label: Multi-Tenancy Mode
+  group: "Multi-Tenancy"
+  show_subquestion_if: true
+  subquestions:
+  - variable: multitenancy.namespace
+    default: ""
+    description: "Tenant namespace (leave empty to use current)"
+    type: string
+    label: Tenant Namespace
+
+# Advanced Configuration
+- variable: config.tags
+  default: |
+    {
+      "Temperature": {
+        "type": "float",
+        "initial_value": 20.0,
+        "simulate": true,
+        "simulation_type": "random",
+        "min": 15.0,
+        "max": 25.0,
+        "units": "°C"
+      }
+    }
+  description: "Tag configuration (JSON format)"
+  type: multiline
+  label: Tag Configuration
+  group: "Configuration"
+
+- variable: config.publishers
+  default: |
+    {
+      "rest_api": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 5000
+      }
+    }
+  description: "Publisher configuration (JSON format)"
+  type: multiline
+  label: Publisher Configuration
+  group: "Configuration"

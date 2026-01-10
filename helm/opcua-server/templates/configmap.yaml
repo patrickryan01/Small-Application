@@ -1,0 +1,16 @@
+{{- /*
+ConfigMap for OPC UA Server Configuration
+Because environment variables for JSON is masochism
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "opcua-server.fullname" . }}-config
+  labels:
+    {{- include "opcua-server.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {
+      "tags": {{ .Values.config.tags | fromYaml | toJson }},
+      "publishers": {{ .Values.config.publishers | fromYaml | toJson }}
+    }

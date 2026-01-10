@@ -1,0 +1,63 @@
+# Helm Chart for OPC UA Multi-Protocol Server
+# Because Rancher UI Store needs proper metadata
+# 
+# Patrick Ryan's Helm Chart
+# "It's like a recipe, but for Kubernetes"
+
+apiVersion: v2
+name: opcua-server
+description: >
+  OPC UA Server with 15 protocols for industrial data streaming.
+  Supports MQTT, Sparkplug B, Kafka, AMQP, WebSocket, REST API, GraphQL, 
+  MODBUS TCP, InfluxDB, Alarms, OPC UA Client, Prometheus, SQLite, 
+  Data Transformation, and a beautiful Web UI. Because apparently that's a thing.
+
+# Chart metadata
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+# Maintainer info
+maintainers:
+  - name: Patrick Ryan
+    email: patrick@fireballindustries.com
+    url: https://github.com/your-repo
+
+# Keywords for Rancher catalog search
+keywords:
+  - opcua
+  - opc-ua
+  - industrial
+  - iot
+  - mqtt
+  - sparkplug
+  - kafka
+  - scada
+  - plc
+  - modbus
+  - influxdb
+  - prometheus
+  - grafana
+  - ignition
+
+# Sources
+sources:
+  - https://github.com/your-repo/opcua-server
+
+# Icon for Rancher UI (optional but looks professional)
+icon: https://raw.githubusercontent.com/your-repo/opcua-server/main/docs/icon.png
+
+# Minimum Kubernetes version
+kubeVersion: ">=1.19.0"
+
+# Dependencies (none for now, but could add if needed)
+# dependencies:
+#   - name: postgresql
+#     version: 12.1.0
+#     repository: https://charts.bitnami.com/bitnami
+#     condition: postgresql.enabled
+
+# Annotations for Rancher catalog
+annotations:
+  category: IoT
+  licenses: MIT
