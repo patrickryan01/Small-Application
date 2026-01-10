@@ -9,13 +9,14 @@ License: MIT
 
 import json
 import logging
+import os
 import threading
 import time
 import requests  # For HTTP requests (Slack webhooks, etc.)
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import paho.mqtt.client as mqtt
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
 try:
@@ -275,6 +276,28 @@ class RESTAPIPublisher(DataPublisher):
     
     def setup_routes(self):
         """Setup Flask routes."""
+        
+        @self.app.route('/', methods=['GET'])
+        def serve_ui():
+            """Serve the EmberBurn Web UI."""
+            try:
+                # Try to serve from web/ directory
+                ui_path = os.path.join(os.path.dirname(__file__), 'web', 'index.html')
+                if os.path.exists(ui_path):
+                    return send_file(ui_path)
+                else:
+                    return jsonify({
+                        "message": "EmberBurn OPC UA Gateway API",
+                        "endpoints": {
+                            "tags": "/api/tags",
+                            "publishers": "/api/publishers",
+                            "alarms": "/api/alarms/active",
+                            "graphql": "http://localhost:5002/graphql"
+                        }
+                    })
+            except Exception as e:
+                self.logger.error(f"Error serving UI: {e}")
+                return jsonify({"error": "UI not available"}), 500
         
         @self.app.route('/api/tags', methods=['GET'])
         def get_all_tags():

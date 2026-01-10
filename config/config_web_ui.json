@@ -1,0 +1,184 @@
+{
+  "tags": {
+    "Temperature": {
+      "type": "float",
+      "initial_value": 22.5,
+      "simulate": true,
+      "simulation_type": "sine",
+      "amplitude": 5.0,
+      "offset": 22.5,
+      "period": 60.0,
+      "description": "Ambient temperature sensor"
+    },
+    "Pressure": {
+      "type": "float",
+      "initial_value": 101.3,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 98.0,
+      "max": 105.0,
+      "description": "System pressure in kPa"
+    },
+    "Flow_Rate": {
+      "type": "float",
+      "initial_value": 15.0,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 10.0,
+      "max": 20.0,
+      "description": "Flow rate in L/min"
+    },
+    "Counter": {
+      "type": "int",
+      "initial_value": 0,
+      "simulate": true,
+      "simulation_type": "increment",
+      "increment": 1,
+      "max": 10000,
+      "reset_on_max": true,
+      "description": "Production counter"
+    },
+    "System_Status": {
+      "type": "string",
+      "initial_value": "RUNNING",
+      "simulate": false,
+      "description": "System operational status"
+    },
+    "Emergency_Stop": {
+      "type": "bool",
+      "initial_value": false,
+      "simulate": false,
+      "description": "Emergency stop button state"
+    },
+    "Motor_Speed": {
+      "type": "float",
+      "initial_value": 1750.0,
+      "simulate": true,
+      "simulation_type": "sine",
+      "amplitude": 50.0,
+      "offset": 1750.0,
+      "period": 45.0,
+      "description": "Motor speed in RPM"
+    },
+    "Tank_Level": {
+      "type": "float",
+      "initial_value": 50.0,
+      "simulate": true,
+      "simulation_type": "sine",
+      "amplitude": 20.0,
+      "offset": 50.0,
+      "period": 120.0,
+      "description": "Tank fill level percentage"
+    },
+    "Vibration": {
+      "type": "float",
+      "initial_value": 0.5,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 0.1,
+      "max": 2.0,
+      "description": "Vibration sensor reading"
+    },
+    "Power_Consumption": {
+      "type": "float",
+      "initial_value": 45.0,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 40.0,
+      "max": 55.0,
+      "description": "Power consumption in kW"
+    }
+  },
+  "publishers": {
+    "rest_api": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 5000
+    },
+    "mqtt": {
+      "enabled": false,
+      "broker": "localhost",
+      "port": 1883,
+      "client_id": "opcua_emberburn",
+      "topic_prefix": "industrial/opcua",
+      "payload_format": "json",
+      "qos": 1
+    },
+    "graphql": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 5002,
+      "enable_graphiql": true
+    },
+    "influxdb": {
+      "enabled": false,
+      "url": "http://localhost:8086",
+      "token": "your-influx-token-here",
+      "org": "fireball-industries",
+      "bucket": "industrial-data",
+      "measurement": "opcua_tags"
+    },
+    "alarms": {
+      "enabled": true,
+      "rules": [
+        {
+          "name": "HighTemperature",
+          "tag": "ns=2;i=2",
+          "condition": ">",
+          "threshold": 26.0,
+          "priority": "WARNING",
+          "message": "Temperature is above normal operating range"
+        },
+        {
+          "name": "HighPressure",
+          "tag": "ns=2;i=3",
+          "condition": ">",
+          "threshold": 103.0,
+          "priority": "CRITICAL",
+          "message": "Pressure has exceeded safe limits!"
+        },
+        {
+          "name": "LowFlowRate",
+          "tag": "ns=2;i=4",
+          "condition": "<",
+          "threshold": 12.0,
+          "priority": "WARNING",
+          "message": "Flow rate is below minimum threshold"
+        }
+      ],
+      "notifications": {
+        "email": {
+          "enabled": false
+        },
+        "slack": {
+          "enabled": false
+        },
+        "sms": {
+          "enabled": false
+        }
+      },
+      "debounce_seconds": 30,
+      "history_size": 100
+    },
+    "websocket": {
+      "enabled": false,
+      "host": "0.0.0.0",
+      "port": 9001
+    },
+    "sparkplug_b": {
+      "enabled": false
+    },
+    "kafka": {
+      "enabled": false
+    },
+    "amqp": {
+      "enabled": false
+    },
+    "modbus_tcp": {
+      "enabled": false
+    },
+    "opcua_client": {
+      "enabled": false
+    }
+  }
+}
