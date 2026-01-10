@@ -731,3 +731,5 @@ Most practical for your use cases:
 2. **OPC UA Client Mode** - Push data to Ignition's OPC UA server
 
 Would you like me to implement either of these? 🚀
+
+Let me know!
