@@ -7,12 +7,12 @@
 ## What We Just Built 🎉
 *Or: "My Descent Into Multi-Protocol Madness"*
 
-So... your OPC UA Server now supports **12 industrial data streaming protocols**. 
+So... your OPC UA Server now supports **12 industrial data streaming protocols** PLUS a beautiful web-based configuration UI.
 
-Yeah, I know. That's like ordering every sauce at Taco Bell instead of just picking one. But here we are in 2024, and somehow this makes sense:
+Yeah, I know. That's like ordering every sauce at Taco Bell instead of just picking one. But here we are in 2026, and somehow this makes sense:
 
 1. ✅ **OPC UA Server** (original) - SCADA systems connect to you (the OG)
-2. ✅ **OPC UA Client** ⭐ NEW - Push to other OPC UA servers (the sequel nobody asked for but everyone needed)
+2. ✅ **OPC UA Client** - Push to other OPC UA servers (the sequel nobody asked for but everyone needed)
 3. ✅ **MQTT** - IoT and cloud (because buzzwords)
 4. ✅ **Sparkplug B** - Ignition Edge (Ignition's favorite child)
 5. ✅ **Apache Kafka** - Enterprise streaming (when MQTT isn't enterprise-y enough)
@@ -21,29 +21,46 @@ Yeah, I know. That's like ordering every sauce at Taco Bell instead of just pick
 8. ✅ **REST API** - HTTP clients (the protocol everyone actually understands)
 9. ✅ **MODBUS TCP** - Legacy PLCs and SCADA systems (respect your elders)
 10. ✅ **GraphQL** - Modern query interface (REST's cooler younger sibling)
-11. ✅ **InfluxDB** ⭐ NEW - Time-series database + Grafana (historical data FTW)
-12. ✅ **Alarms & Notifications** ⭐ NEW - Email/Slack/SMS alerting (sleep is overrated anyway)
+11. ✅ **InfluxDB** - Time-series database + Grafana (historical data FTW)
+12. ✅ **Alarms & Notifications** - Email/Slack/SMS alerting (sleep is overrated anyway)
+13. 🔥 **EmberBurn Web UI** ⭐ NEW - Beautiful React dashboard (no more JSON editing!)
 
 ## New Files Created
 
+### Web UI
+- `web/index.html` - EmberBurn Web Configuration Dashboard
+  - Real-time tag monitoring
+  - Publisher management (enable/disable with one click)
+  - Alarm dashboard
+  - Fire-themed design with ASCII art branding
+  - React + Pure CSS (no build step!)
+
 ### Configuration Files
 - `config/config_all_publishers.json` - All protocols enabled
+- `config/config_web_ui.json` - Web UI demo configuration
 - `config/config_ignition.json` - Optimized for Ignition Edge
 - `config/config_nodered.json` - Optimized for Node-RED
 - `config/config_modbus.json` - MODBUS TCP configuration
 - `config/config_opcua_client.json` - OPC UA Client single server
 - `config/config_opcua_multi_server.json` - OPC UA Client multiple servers
+- `config/config_graphql.json` - GraphQL API configuration
+- `config/config_influxdb.json` - InfluxDB configuration
+- `config/config_alarms.json` - Alarms & notifications configuration
 
 ### Documentation
+- **`docs/WEB_UI.md`** ⭐ NEW - Complete EmberBurn Web UI guide
 - `docs/IGNITION_INTEGRATION.md` - Complete Ignition Edge setup guide
 - `docs/NODERED_INTEGRATION.md` - Complete Node-RED setup guide
 - `docs/PROTOCOL_GUIDE.md` - All industrial protocols explained
 - `docs/MODBUS_INTEGRATION.md` - MODBUS TCP integration guide
 - `docs/OPCUA_CLIENT_INTEGRATION.md` - OPC UA Client complete guide
 - `docs/OPCUA_CLIENT_QUICKSTART.md` - OPC UA Client quick start
+- `docs/GRAPHQL_INTEGRATION.md` - GraphQL API guide
+- `docs/INFLUXDB_GRAFANA_INTEGRATION.md` - Time-series database guide
+- `docs/ALARMS_NOTIFICATIONS.md` - Alerting system guide
 
 ### Code
-- Updated `publishers.py` with 6 new publishers:
+- Updated `publishers.py` with 12 publishers total:
   - `SparkplugBPublisher` - For Ignition
   - `KafkaPublisher` - Enterprise streaming
   - `AMQPPublisher` - RabbitMQ
