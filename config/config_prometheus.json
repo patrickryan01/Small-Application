@@ -1,0 +1,21 @@
+{
+  "prometheus": {
+    "enabled": true,
+    "description": "Prometheus Metrics Publisher - Operational metrics, publisher health monitoring, and integration with existing monitoring stacks",
+    "config": {
+      "port": 9090,
+      "collect_system_metrics": true,
+      "collect_tag_metrics": true,
+      "collect_publisher_metrics": true,
+      "collect_alarm_metrics": true,
+      "metrics_update_interval": 5,
+      "enable_performance_metrics": true,
+      "metric_prefix": "emberburn_",
+      "labels": {
+        "environment": "production",
+        "instance": "opcua-server-01",
+        "datacenter": "dc1"
+      }
+    }
+  }
+}

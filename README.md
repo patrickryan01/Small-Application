@@ -6,9 +6,9 @@
 
 > Sometimes you need fake industrial data that's more reliable than your actual production environment. This is that.
 
-A lightweight, configurable OPC UA server built with Python that simulates industrial process tags **AND publishes data to 12 different protocols simultaneously**. Perfect for testing Ignition Edge, SCADA systems, or any OPC UA client without needing actual hardware. Or money. Or patience.
+A lightweight, configurable OPC UA server built with Python that simulates industrial process tags **AND publishes data to 13 different protocols simultaneously**. Perfect for testing Ignition Edge, SCADA systems, or any OPC UA client without needing actual hardware. Or money. Or patience.
 
-Now with MQTT, REST API, Sparkplug B, Kafka, AMQP, WebSocket, MODBUS TCP, GraphQL, InfluxDB, Alarms, OPC UA Client, AND a beautiful web-based configuration UI! (Yes, we got carried away. No, we're not sorry.)
+Now with MQTT, REST API, Sparkplug B, Kafka, AMQP, WebSocket, MODBUS TCP, GraphQL, InfluxDB, Alarms, OPC UA Client, Prometheus, AND a beautiful web-based configuration UI! (Yes, we got carried away. No, we're not sorry.)
 
 ## What Does This Actually Do?
 *The TL;DR for People With Deadlines*
@@ -42,7 +42,8 @@ Great for development, testing, demos, or just pretending you have a fully instr
 - **🆕 InfluxDB**: Time-series database storage + Grafana dashboards - Historical data that doesn't lie
 - **🆕 Alarms**: Threshold-based alerting via email/Slack/SMS - Sleep soundly (or don't, when things break)
 - **🆕 OPC UA Client**: Push data to other OPC UA servers (Ignition, historians) - Bidirectional baby!
-- **🆕 Multi-Protocol**: Run 12 protocols simultaneously - Because we have issues
+- **🆕 Prometheus**: Operational metrics (uptime, message counts, errors) - Monitor all the things!
+- **🆕 Multi-Protocol**: Run 13 protocols simultaneously - Because we have issues
 - **🔥 EmberBurn Web UI**: Beautiful **Python Flask** web application for configuration and monitoring - Professional, scalable, no build step!
 
 ## Quick Start
@@ -380,7 +381,8 @@ Found a bug? Have an idea? PRs welcome. Please include:
 **Core Guides:**
 - [Configuration Guide](docs/CONFIGURATION.md) - Complete tag and publisher configuration
 - [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) - System architecture and data flow
-- [Multi-Protocol Summary](docs/MULTI_PROTOCOL_SUMMARY.md) - All 12 protocols explained
+- [Multi-Protocol Summary](docs/MULTI_PROTOCOL_SUMMARY.md) - All 13 protocols explained
+- [Prometheus Integration](docs/PROMETHEUS_INTEGRATION.md) - Operational metrics and monitoring
 - [Protocol Comparison Guide](docs/PROTOCOL_GUIDE.md) - Which protocol for which job?
 - **[🔥 EmberBurn Web UI](docs/PYTHON_WEB_APP.md) - Python Flask web application guide** ⭐ NEW!
 - [Web UI Features](docs/WEB_UI.md) - Complete UI feature documentation

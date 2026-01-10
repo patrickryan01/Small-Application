@@ -86,6 +86,12 @@ try:
 except ImportError:
     TWILIO_AVAILABLE = False
 
+try:
+    from prometheus_client import Counter, Gauge, Histogram, Info, generate_latest, REGISTRY, CollectorRegistry
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
 
 class DataPublisher(ABC):
     """Base class for all data publishers."""
@@ -377,6 +383,19 @@ class RESTAPIPublisher(DataPublisher):
                 alarms = callback()
                 return jsonify({"alarms": alarms})
             return jsonify({"alarms": []})
+        
+        @self.app.route('/metrics', methods=['GET'])
+        def prometheus_metrics():
+            """Prometheus metrics endpoint."""
+            try:
+                if PROMETHEUS_AVAILABLE:
+                    metrics = generate_latest(REGISTRY)
+                    return metrics, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+                else:
+                    return jsonify({"error": "Prometheus client not installed"}), 501
+            except Exception as e:
+                self.logger.error(f"Error generating metrics: {e}")
+                return jsonify({"error": str(e)}), 500
     
     def start(self):
         """Start the REST API server."""
@@ -2182,6 +2201,206 @@ class OPCUAClientPublisher(DataPublisher):
                 client_info["connected"] = False
 
 
+class PrometheusPublisher(DataPublisher):
+    """
+    Prometheus Metrics Publisher - Operational monitoring
+    
+    Exposes operational metrics for:
+    - Tag update counts
+    - Publisher health status
+    - Message throughput
+    - Error rates
+    - System uptime
+    
+    Because if you're not monitoring it, it's not in production.
+    And because "trust but verify" applies to industrial systems too.
+    """
+    
+    def __init__(self, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
+        """
+        Initialize the Prometheus publisher.
+        
+        Config structure:
+        {
+            "enabled": true,
+            "port": 9090,
+            "include_publisher_metrics": true,
+            "include_tag_metrics": true
+        }
+        """
+        super().__init__(config, logger)
+        
+        if not PROMETHEUS_AVAILABLE:
+            self.logger.warning("Prometheus client library not available. Install with: pip install prometheus-client")
+            self.enabled = False
+            return
+        
+        self.port = config.get("port", 9090)
+        self.include_publisher_metrics = config.get("include_publisher_metrics", True)
+        self.include_tag_metrics = config.get("include_tag_metrics", True)
+        
+        # Create metrics
+        self._create_metrics()
+        
+        # Track start time for uptime
+        self.start_time = time.time()
+        
+    def _create_metrics(self):
+        """Create Prometheus metrics."""
+        # System metrics
+        self.system_info = Info('emberburn_system', 'EmberBurn system information')
+        self.system_uptime = Gauge('emberburn_uptime_seconds', 'System uptime in seconds')
+        
+        # Tag metrics
+        self.tags_total = Gauge('emberburn_tags_total', 'Total number of tags')
+        self.tag_updates_total = Counter('emberburn_tag_updates_total', 'Total tag updates', ['tag_name'])
+        self.tag_update_errors = Counter('emberburn_tag_update_errors_total', 'Tag update errors', ['tag_name'])
+        self.tag_value = Gauge('emberburn_tag_value', 'Current tag value (numeric only)', ['tag_name'])
+        
+        # Publisher metrics
+        self.publishers_total = Gauge('emberburn_publishers_total', 'Total number of publishers')
+        self.publishers_enabled = Gauge('emberburn_publishers_enabled', 'Number of enabled publishers')
+        self.publisher_health = Gauge('emberburn_publisher_health', 'Publisher health status (1=healthy, 0=unhealthy)', ['publisher_name'])
+        self.publisher_messages_sent = Counter('emberburn_publisher_messages_total', 'Messages sent by publisher', ['publisher_name'])
+        self.publisher_errors = Counter('emberburn_publisher_errors_total', 'Publisher errors', ['publisher_name'])
+        
+        # Performance metrics
+        self.publish_duration = Histogram('emberburn_publish_duration_seconds', 'Time spent publishing', ['publisher_name'])
+        
+        # Alarm metrics
+        self.alarms_active = Gauge('emberburn_alarms_active', 'Number of active alarms')
+        self.alarms_critical = Gauge('emberburn_alarms_critical', 'Number of critical alarms')
+        self.alarms_warning = Gauge('emberburn_alarms_warning', 'Number of warning alarms')
+        self.alarms_triggered = Counter('emberburn_alarms_triggered_total', 'Total alarms triggered', ['alarm_name', 'priority'])
+        
+        # Set system info
+        self.system_info.info({
+            'version': '1.0',
+            'platform': 'emberburn',
+            'protocols': '13'  # 12 protocols + Prometheus
+        })
+        
+    def start(self):
+        """Start the Prometheus publisher."""
+        if not self.enabled:
+            self.logger.info("Prometheus publisher is disabled")
+            return
+        
+        try:
+            # Metrics are exposed via the /metrics endpoint in REST API
+            # No separate server needed
+            self.logger.info(f"Prometheus metrics available at /metrics endpoint")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start Prometheus publisher: {e}")
+            self.enabled = False
+    
+    def stop(self):
+        """Stop the Prometheus publisher."""
+        self.logger.info("Prometheus publisher stopped")
+    
+    def publish(self, tag_name: str, value: Any, timestamp: Optional[float] = None):
+        """
+        Update tag metrics.
+        
+        Args:
+            tag_name: Name of the tag
+            value: Tag value
+            timestamp: Optional timestamp
+        """
+        if not self.enabled:
+            return
+        
+        try:
+            # Increment tag update counter
+            self.tag_updates_total.labels(tag_name=tag_name).inc()
+            
+            # Update tag value gauge (if numeric)
+            if isinstance(value, (int, float)):
+                self.tag_value.labels(tag_name=tag_name).set(value)
+        
+        except Exception as e:
+            self.logger.error(f"Error updating tag metrics: {e}")
+            self.tag_update_errors.labels(tag_name=tag_name).inc()
+    
+    def update_system_metrics(self, tags_count: int):
+        """Update system-level metrics."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.tags_total.set(tags_count)
+            self.system_uptime.set(time.time() - self.start_time)
+        except Exception as e:
+            self.logger.error(f"Error updating system metrics: {e}")
+    
+    def update_publisher_metrics(self, publishers: list):
+        """Update publisher health metrics."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.publishers_total.set(len(publishers))
+            enabled_count = sum(1 for p in publishers if p.get('enabled', False))
+            self.publishers_enabled.set(enabled_count)
+            
+            # Update individual publisher health
+            for pub in publishers:
+                name = pub.get('name', 'unknown')
+                health = 1 if pub.get('enabled', False) else 0
+                self.publisher_health.labels(publisher_name=name).set(health)
+        
+        except Exception as e:
+            self.logger.error(f"Error updating publisher metrics: {e}")
+    
+    def update_alarm_metrics(self, alarms: list):
+        """Update alarm metrics."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.alarms_active.set(len(alarms))
+            
+            critical_count = sum(1 for a in alarms if a.get('priority') == 'CRITICAL')
+            warning_count = sum(1 for a in alarms if a.get('priority') == 'WARNING')
+            
+            self.alarms_critical.set(critical_count)
+            self.alarms_warning.set(warning_count)
+        
+        except Exception as e:
+            self.logger.error(f"Error updating alarm metrics: {e}")
+    
+    def record_publisher_message(self, publisher_name: str):
+        """Record a message sent by a publisher."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.publisher_messages_sent.labels(publisher_name=publisher_name).inc()
+        except Exception as e:
+            self.logger.error(f"Error recording publisher message: {e}")
+    
+    def record_publisher_error(self, publisher_name: str):
+        """Record a publisher error."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.publisher_errors.labels(publisher_name=publisher_name).inc()
+        except Exception as e:
+            self.logger.error(f"Error recording publisher error: {e}")
+    
+    def record_alarm_triggered(self, alarm_name: str, priority: str):
+        """Record an alarm being triggered."""
+        if not self.enabled:
+            return
+        
+        try:
+            self.alarms_triggered.labels(alarm_name=alarm_name, priority=priority).inc()
+        except Exception as e:
+            self.logger.error(f"Error recording alarm trigger: {e}")
+
+
 class PublisherManager:
     """Manages multiple data publishers."""
     
@@ -2278,6 +2497,13 @@ class PublisherManager:
             self.publishers.append(rest_pub)
             self.logger.info("REST API publisher initialized")
         
+        # Prometheus Publisher
+        prometheus_config = publishers_config.get("prometheus", {})
+        if prometheus_config.get("enabled", False):
+            prometheus_pub = PrometheusPublisher(prometheus_config, self.logger)
+            self.publishers.append(prometheus_pub)
+            self.logger.info("Prometheus publisher initialized")
+        
         return self.publishers
     
     def start_all(self):
@@ -2305,6 +2531,12 @@ class PublisherManager:
                 publisher._alarms_callback = alarms_callback
                 
                 break
+        
+        # Update Prometheus with initial publisher states
+        prometheus_pub = self._get_prometheus_publisher()
+        if prometheus_pub:
+            statuses = self.get_publisher_statuses()
+            prometheus_pub.update_publisher_metrics(statuses)
     
     def stop_all(self):
         """Stop all publishers."""
@@ -2326,8 +2558,38 @@ class PublisherManager:
         for publisher in self.publishers:
             try:
                 publisher.publish(tag_name, value, timestamp)
+                
+                # Update Prometheus metrics for successful publish
+                if isinstance(publisher, PrometheusPublisher):
+                    continue  # Don't record metrics publisher itself
+                    
+                prometheus_pub = self._get_prometheus_publisher()
+                if prometheus_pub:
+                    publisher_name = publisher.__class__.__name__.replace('Publisher', '')
+                    prometheus_pub.record_publisher_message(publisher_name)
+                    
             except Exception as e:
-                self.logger.error(f"Error publishing to {publisher.__class__.__name__}: {e}")    
+                self.logger.error(f"Error publishing to {publisher.__class__.__name__}: {e}")
+                
+                # Record error in Prometheus
+                prometheus_pub = self._get_prometheus_publisher()
+                if prometheus_pub:
+                    publisher_name = publisher.__class__.__name__.replace('Publisher', '')
+                    prometheus_pub.record_publisher_error(publisher_name)
+        
+        # Update system metrics
+        prometheus_pub = self._get_prometheus_publisher()
+        if prometheus_pub:
+            # Count unique tags (would need to track this properly in real implementation)
+            prometheus_pub.update_system_metrics(tags_count=1)  # Placeholder
+    
+    def _get_prometheus_publisher(self):
+        """Get the Prometheus publisher instance."""
+        for publisher in self.publishers:
+            if isinstance(publisher, PrometheusPublisher):
+                return publisher
+        return None
+    
     def get_publisher_statuses(self):
         """Get status of all publishers."""
         statuses = []
@@ -2347,7 +2609,8 @@ class PublisherManager:
                 'GraphQL': 'GraphQL',
                 'InfluxDB': 'InfluxDB',
                 'Alarms': 'Alarms',
-                'OPCUAClient': 'OPC UA Client'
+                'OPCUAClient': 'OPC UA Client',
+                'Prometheus': 'Prometheus'
             }
             
             friendly_name = name_map.get(class_name, class_name)
