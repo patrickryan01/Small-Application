@@ -29,7 +29,9 @@ Great for development, testing, demos, or just pretending you have a fully instr
 - **🆕 AMQP (RabbitMQ)**: Enterprise messaging
 - **🆕 WebSocket**: Real-time browser updates
 - **🆕 REST API**: Query and write tags via HTTP endpoints
-- **🆕 Multi-Protocol**: Run 7+ protocols simultaneously
+- **🆕 MODBUS TCP**: Legacy PLC and SCADA support
+- **🆕 OPC UA Client**: Push data to other OPC UA servers (Ignition, historians)
+- **🆕 Multi-Protocol**: Run 9+ protocols simultaneously
 
 ## Quick Start
 
