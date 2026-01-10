@@ -17,6 +17,7 @@ import sys
 import logging
 from datetime import datetime
 from pathlib import Path
+from publishers import PublisherManager
 
 
 class OPCUAServer: 
@@ -40,6 +41,8 @@ class OPCUAServer:
         self.running = True
         self.tags = {}
         self.update_interval = float(os.getenv('UPDATE_INTERVAL', '2'))
+        self.publisher_manager = None
+        self.full_config = None
         
         # Setup logging
         self.setup_logging(log_level)
@@ -78,7 +81,10 @@ class OPCUAServer:
             with open(config_path, 'r') as f:
                 config = json.load(f)
                 self.logger.info(f"Loaded configuration from {self.config_file}")
-                return config
+                # Store full config for publishers
+                self.full_config = config
+                # Return just the tags section if it exists, otherwise use entire config as tags
+                return config.get('tags', config)
                 
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON in config file: {e}")
@@ -226,6 +232,8 @@ class OPCUAServer:
     
     def update_tags(self):
         """Update tag values based on simulation configuration."""
+        timestamp = time.time()
+        
         for tag_name, tag_data in self.tags.items():
             try:
                 var = tag_data["variable"]
@@ -253,6 +261,10 @@ class OPCUAServer:
                     new_value = self.generate_sine_value(config, tag_type)
                     var.set_value(new_value)
                     self.logger.debug(f"{tag_name}: {current_value} -> {new_value}")
+                
+                # Publish to all configured publishers (MQTT, REST API, etc.)
+                if self.publisher_manager:
+                    self.publisher_manager.publish_to_all(tag_name, var.get_value(), timestamp)
                     
             except Exception as e:
                 self.logger.error(f"Error updating tag {tag_name}: {e}")
@@ -365,6 +377,13 @@ class OPCUAServer:
             self.server.start()
             
             self.logger.info(f"OPC UA Server started at {self.server.endpoint}")
+            
+            # Initialize and start data publishers
+            if self.full_config:
+                self.publisher_manager = PublisherManager(self.full_config, self.logger)
+                self.publisher_manager.initialize_publishers()
+                self.publisher_manager.start_all()
+            
             self.print_server_info()
             
             # Main loop
@@ -380,6 +399,16 @@ class OPCUAServer:
     def shutdown(self):
         """Gracefully shutdown the server."""
         self.logger.info("Shutting down server...")
+        
+        # Stop publishers first
+        if self.publisher_manager:
+            try:
+                self.publisher_manager.stop_all()
+                self.logger.info("Publishers stopped successfully")
+            except Exception as e:
+                self.logger.error(f"Error stopping publishers: {e}")
+        
+        # Stop OPC UA server
         if self.server:
             try:
                 self.server.stop()
