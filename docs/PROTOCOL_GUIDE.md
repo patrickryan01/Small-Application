@@ -626,7 +626,7 @@ Based on your needs (Ignition Edge, Node-RED, industrial data streaming):
 | **AMQP** | Medium | High | Medium | Enterprise Messaging |
 | **WebSocket** | Very Low | Medium | Low | Web Browsers ⭐ |
 | **REST API** | High | Low | Very Low | Web Apps, Polling |
-| **MODBUS TCP** | Medium | Low | Low | Legacy PLCs |
+| **MODBUS TCP** | Low | Medium | Low | Legacy PLCs ⭐ |
 | **EtherNet/IP** | Low | Medium | High | ❌ Not suitable |
 | **PROFINET** | Very Low | High | High | ❌ Not suitable |
 | **EtherCAT** | Ultra Low | Very High | Very High | ❌ Not suitable |
