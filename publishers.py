@@ -92,6 +92,9 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
+import sqlite3
+import threading
+
 
 class DataPublisher(ABC):
     """Base class for all data publishers."""
@@ -2401,6 +2404,506 @@ class PrometheusPublisher(DataPublisher):
             self.logger.error(f"Error recording alarm trigger: {e}")
 
 
+class SQLitePersistencePublisher(DataPublisher):
+    """
+    SQLite Persistence Publisher - Local data storage with historical tag values and audit logging.
+    
+    Features:
+    - Historical tag value storage with timestamps
+    - Audit logging for system events
+    - Configurable retention policies
+    - Automatic database cleanup
+    - Thread-safe operations
+    - Query API for historical data
+    """
+    
+    def __init__(self, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
+        """Initialize SQLite persistence publisher."""
+        super().__init__(config, logger)
+        self.db_path = self.config.get("db_path", "emberburn_data.db")
+        self.retention_days = self.config.get("retention_days", 30)
+        self.batch_size = self.config.get("batch_size", 100)
+        self.enable_tag_history = self.config.get("enable_tag_history", True)
+        self.enable_audit_log = self.config.get("enable_audit_log", True)
+        self.auto_vacuum = self.config.get("auto_vacuum", True)
+        
+        self.connection = None
+        self.db_lock = threading.Lock()
+        self.write_buffer = []
+        self.audit_buffer = []
+        
+    def start(self):
+        """Start the SQLite publisher and initialize database."""
+        try:
+            self._init_database()
+            self.enabled = True
+            self.logger.info(f"SQLite persistence started (database: {self.db_path})")
+            self._log_audit_event("system", "SQLitePersistence", "Publisher started", "info")
+        except Exception as e:
+            self.logger.error(f"Failed to start SQLite persistence: {e}")
+            self.enabled = False
+    
+    def stop(self):
+        """Stop the SQLite publisher and flush buffers."""
+        try:
+            self._flush_buffers()
+            self._log_audit_event("system", "SQLitePersistence", "Publisher stopped", "info")
+            
+            if self.connection:
+                self.connection.close()
+                self.connection = None
+            
+            self.enabled = False
+            self.logger.info("SQLite persistence stopped")
+        except Exception as e:
+            self.logger.error(f"Error stopping SQLite persistence: {e}")
+    
+    def publish(self, tag_name: str, value: Any, data_type: str):
+        """
+        Publish tag value to SQLite database.
+        
+        Args:
+            tag_name: Name of the tag
+            value: Tag value
+            data_type: Data type of the tag
+        """
+        if not self.enabled or not self.enable_tag_history:
+            return
+        
+        try:
+            # Convert value to string for storage
+            value_str = str(value)
+            timestamp = datetime.now().isoformat()
+            
+            # Add to write buffer
+            self.write_buffer.append((tag_name, value_str, data_type, timestamp))
+            
+            # Flush if batch size reached
+            if len(self.write_buffer) >= self.batch_size:
+                self._flush_tag_history()
+            
+        except Exception as e:
+            self.logger.error(f"Error publishing to SQLite: {e}")
+    
+    def _init_database(self):
+        """Initialize SQLite database and create tables."""
+        with self.db_lock:
+            self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+            cursor = self.connection.cursor()
+            
+            # Tag history table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tag_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tag_name TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    data_type TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Create indexes for performance
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_tag_history_tag_name 
+                ON tag_history(tag_name)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_tag_history_timestamp 
+                ON tag_history(timestamp DESC)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_tag_history_created_at 
+                ON tag_history(created_at DESC)
+            ''')
+            
+            # Audit log table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    event_source TEXT NOT NULL,
+                    event_details TEXT,
+                    severity TEXT DEFAULT 'info',
+                    user TEXT,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_audit_log_event_type 
+                ON audit_log(event_type)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp 
+                ON audit_log(timestamp DESC)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_audit_log_severity 
+                ON audit_log(severity)
+            ''')
+            
+            # System events table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    severity TEXT DEFAULT 'info',
+                    details TEXT,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_system_events_timestamp 
+                ON system_events(timestamp DESC)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_system_events_severity 
+                ON system_events(severity)
+            ''')
+            
+            # Publisher statistics table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS publisher_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    publisher_name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    messages_sent INTEGER DEFAULT 0,
+                    errors INTEGER DEFAULT 0,
+                    last_message TEXT,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_publisher_stats_publisher 
+                ON publisher_stats(publisher_name, timestamp DESC)
+            ''')
+            
+            self.connection.commit()
+            
+            # Auto-vacuum if enabled
+            if self.auto_vacuum:
+                cursor.execute("PRAGMA auto_vacuum = FULL")
+                cursor.execute("VACUUM")
+            
+            self.logger.info(f"SQLite database initialized at {self.db_path}")
+    
+    def _flush_tag_history(self):
+        """Flush tag history buffer to database."""
+        if not self.write_buffer:
+            return
+        
+        try:
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                cursor.executemany(
+                    'INSERT INTO tag_history (tag_name, value, data_type, timestamp) VALUES (?, ?, ?, ?)',
+                    self.write_buffer
+                )
+                self.connection.commit()
+                self.logger.debug(f"Flushed {len(self.write_buffer)} tag history records")
+                self.write_buffer.clear()
+        except Exception as e:
+            self.logger.error(f"Error flushing tag history: {e}")
+    
+    def _flush_audit_log(self):
+        """Flush audit log buffer to database."""
+        if not self.audit_buffer:
+            return
+        
+        try:
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                cursor.executemany(
+                    'INSERT INTO audit_log (event_type, event_source, event_details, severity, user, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+                    self.audit_buffer
+                )
+                self.connection.commit()
+                self.logger.debug(f"Flushed {len(self.audit_buffer)} audit log records")
+                self.audit_buffer.clear()
+        except Exception as e:
+            self.logger.error(f"Error flushing audit log: {e}")
+    
+    def _flush_buffers(self):
+        """Flush all buffers to database."""
+        self._flush_tag_history()
+        self._flush_audit_log()
+    
+    def _log_audit_event(self, event_type: str, event_source: str, event_details: str, 
+                        severity: str = "info", user: str = None):
+        """
+        Log an audit event.
+        
+        Args:
+            event_type: Type of event (system, tag, publisher, alarm, user)
+            event_source: Source of the event
+            event_details: Details of the event
+            severity: Severity level (info, warning, error, critical)
+            user: User who triggered the event (optional)
+        """
+        if not self.enabled or not self.enable_audit_log:
+            return
+        
+        try:
+            timestamp = datetime.now().isoformat()
+            self.audit_buffer.append((event_type, event_source, event_details, severity, user, timestamp))
+            
+            # Flush if batch size reached
+            if len(self.audit_buffer) >= self.batch_size:
+                self._flush_audit_log()
+        except Exception as e:
+            self.logger.error(f"Error logging audit event: {e}")
+    
+    def log_system_event(self, event_type: str, message: str, severity: str = "info", details: str = None):
+        """
+        Log a system event.
+        
+        Args:
+            event_type: Type of event (startup, shutdown, error, etc.)
+            message: Event message
+            severity: Severity level
+            details: Additional details (optional)
+        """
+        if not self.enabled:
+            return
+        
+        try:
+            timestamp = datetime.now().isoformat()
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                cursor.execute(
+                    'INSERT INTO system_events (event_type, message, severity, details, timestamp) VALUES (?, ?, ?, ?, ?)',
+                    (event_type, message, severity, details, timestamp)
+                )
+                self.connection.commit()
+        except Exception as e:
+            self.logger.error(f"Error logging system event: {e}")
+    
+    def log_publisher_stats(self, publisher_name: str, status: str, messages_sent: int = 0, 
+                           errors: int = 0, last_message: str = None):
+        """
+        Log publisher statistics.
+        
+        Args:
+            publisher_name: Name of the publisher
+            status: Current status
+            messages_sent: Number of messages sent
+            errors: Number of errors
+            last_message: Last message sent
+        """
+        if not self.enabled:
+            return
+        
+        try:
+            timestamp = datetime.now().isoformat()
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                cursor.execute(
+                    'INSERT INTO publisher_stats (publisher_name, status, messages_sent, errors, last_message, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+                    (publisher_name, status, messages_sent, errors, last_message, timestamp)
+                )
+                self.connection.commit()
+        except Exception as e:
+            self.logger.error(f"Error logging publisher stats: {e}")
+    
+    def cleanup_old_data(self):
+        """Clean up data older than retention period."""
+        if not self.enabled:
+            return
+        
+        try:
+            cutoff_date = (datetime.now() - timedelta(days=self.retention_days)).isoformat()
+            
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                
+                # Clean up tag history
+                cursor.execute('DELETE FROM tag_history WHERE timestamp < ?', (cutoff_date,))
+                tag_deleted = cursor.rowcount
+                
+                # Clean up audit log
+                cursor.execute('DELETE FROM audit_log WHERE timestamp < ?', (cutoff_date,))
+                audit_deleted = cursor.rowcount
+                
+                # Clean up system events
+                cursor.execute('DELETE FROM system_events WHERE timestamp < ?', (cutoff_date,))
+                events_deleted = cursor.rowcount
+                
+                # Clean up publisher stats
+                cursor.execute('DELETE FROM publisher_stats WHERE timestamp < ?', (cutoff_date,))
+                stats_deleted = cursor.rowcount
+                
+                self.connection.commit()
+                
+                if self.auto_vacuum:
+                    cursor.execute("VACUUM")
+                
+                self.logger.info(
+                    f"Cleaned up old data: {tag_deleted} tag records, {audit_deleted} audit records, "
+                    f"{events_deleted} system events, {stats_deleted} publisher stats"
+                )
+                
+                self._log_audit_event("system", "SQLitePersistence", 
+                                     f"Cleaned up {tag_deleted + audit_deleted + events_deleted + stats_deleted} old records",
+                                     "info")
+        except Exception as e:
+            self.logger.error(f"Error cleaning up old data: {e}")
+    
+    def get_tag_history(self, tag_name: str, start_time: str = None, end_time: str = None, 
+                       limit: int = 1000) -> List[Tuple]:
+        """
+        Get historical tag values.
+        
+        Args:
+            tag_name: Name of the tag
+            start_time: Start time (ISO format)
+            end_time: End time (ISO format)
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of tuples (tag_name, value, data_type, timestamp)
+        """
+        if not self.enabled:
+            return []
+        
+        try:
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                
+                query = 'SELECT tag_name, value, data_type, timestamp FROM tag_history WHERE tag_name = ?'
+                params = [tag_name]
+                
+                if start_time:
+                    query += ' AND timestamp >= ?'
+                    params.append(start_time)
+                
+                if end_time:
+                    query += ' AND timestamp <= ?'
+                    params.append(end_time)
+                
+                query += ' ORDER BY timestamp DESC LIMIT ?'
+                params.append(limit)
+                
+                cursor.execute(query, params)
+                return cursor.fetchall()
+        except Exception as e:
+            self.logger.error(f"Error getting tag history: {e}")
+            return []
+    
+    def get_audit_log(self, event_type: str = None, severity: str = None, 
+                     start_time: str = None, end_time: str = None, limit: int = 1000) -> List[Tuple]:
+        """
+        Get audit log entries.
+        
+        Args:
+            event_type: Filter by event type
+            severity: Filter by severity
+            start_time: Start time (ISO format)
+            end_time: End time (ISO format)
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of tuples (event_type, event_source, event_details, severity, user, timestamp)
+        """
+        if not self.enabled:
+            return []
+        
+        try:
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                
+                query = 'SELECT event_type, event_source, event_details, severity, user, timestamp FROM audit_log WHERE 1=1'
+                params = []
+                
+                if event_type:
+                    query += ' AND event_type = ?'
+                    params.append(event_type)
+                
+                if severity:
+                    query += ' AND severity = ?'
+                    params.append(severity)
+                
+                if start_time:
+                    query += ' AND timestamp >= ?'
+                    params.append(start_time)
+                
+                if end_time:
+                    query += ' AND timestamp <= ?'
+                    params.append(end_time)
+                
+                query += ' ORDER BY timestamp DESC LIMIT ?'
+                params.append(limit)
+                
+                cursor.execute(query, params)
+                return cursor.fetchall()
+        except Exception as e:
+            self.logger.error(f"Error getting audit log: {e}")
+            return []
+    
+    def get_database_stats(self) -> Dict[str, Any]:
+        """
+        Get database statistics.
+        
+        Returns:
+            Dictionary with database statistics
+        """
+        if not self.enabled:
+            return {}
+        
+        try:
+            with self.db_lock:
+                cursor = self.connection.cursor()
+                
+                stats = {}
+                
+                # Tag history count
+                cursor.execute('SELECT COUNT(*) FROM tag_history')
+                stats['tag_history_count'] = cursor.fetchone()[0]
+                
+                # Audit log count
+                cursor.execute('SELECT COUNT(*) FROM audit_log')
+                stats['audit_log_count'] = cursor.fetchone()[0]
+                
+                # System events count
+                cursor.execute('SELECT COUNT(*) FROM system_events')
+                stats['system_events_count'] = cursor.fetchone()[0]
+                
+                # Publisher stats count
+                cursor.execute('SELECT COUNT(*) FROM publisher_stats')
+                stats['publisher_stats_count'] = cursor.fetchone()[0]
+                
+                # Database file size
+                cursor.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
+                stats['database_size_bytes'] = cursor.fetchone()[0]
+                stats['database_size_mb'] = round(stats['database_size_bytes'] / 1024 / 1024, 2)
+                
+                # Oldest record
+                cursor.execute('SELECT MIN(timestamp) FROM tag_history')
+                oldest = cursor.fetchone()[0]
+                stats['oldest_record'] = oldest if oldest else None
+                
+                # Newest record
+                cursor.execute('SELECT MAX(timestamp) FROM tag_history')
+                newest = cursor.fetchone()[0]
+                stats['newest_record'] = newest if newest else None
+                
+                return stats
+        except Exception as e:
+            self.logger.error(f"Error getting database stats: {e}")
+            return {}
+
+
 class PublisherManager:
     """Manages multiple data publishers."""
     
@@ -2415,6 +2918,7 @@ class PublisherManager:
         self.config = config
         self.logger = logger or logging.getLogger("PublisherManager")
         self.publishers = []
+
         
     def initialize_publishers(self):
         """Initialize all configured publishers."""
@@ -2503,6 +3007,13 @@ class PublisherManager:
             prometheus_pub = PrometheusPublisher(prometheus_config, self.logger)
             self.publishers.append(prometheus_pub)
             self.logger.info("Prometheus publisher initialized")
+        
+        # SQLite Persistence Publisher
+        sqlite_config = publishers_config.get("sqlite_persistence", {})
+        if sqlite_config.get("enabled", False):
+            sqlite_pub = SQLitePersistencePublisher(sqlite_config, self.logger)
+            self.publishers.append(sqlite_pub)
+            self.logger.info("SQLite Persistence publisher initialized")
         
         return self.publishers
     
@@ -2610,7 +3121,8 @@ class PublisherManager:
                 'InfluxDB': 'InfluxDB',
                 'Alarms': 'Alarms',
                 'OPCUAClient': 'OPC UA Client',
-                'Prometheus': 'Prometheus'
+                'Prometheus': 'Prometheus',
+                'SQLitePersistence': 'SQLite Persistence'
             }
             
             friendly_name = name_map.get(class_name, class_name)
@@ -2638,7 +3150,9 @@ class PublisherManager:
                 'GraphQL': 'GraphQL',
                 'InfluxDB': 'InfluxDB',
                 'Alarms': 'Alarms',
-                'OPCUAClient': 'OPC UA Client'
+                'OPCUAClient': 'OPC UA Client',
+                'Prometheus': 'Prometheus',
+                'SQLitePersistence': 'SQLite Persistence'
             }
             
             friendly_name = name_map.get(class_name, class_name)

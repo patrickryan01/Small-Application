@@ -1,0 +1,19 @@
+{
+  "sqlite_persistence": {
+    "enabled": true,
+    "description": "SQLite Persistence - Local data storage with historical tag values and audit logging",
+    "config": {
+      "db_path": "emberburn_data.db",
+      "retention_days": 30,
+      "batch_size": 100,
+      "enable_tag_history": true,
+      "enable_audit_log": true,
+      "auto_vacuum": true,
+      "cleanup_interval_hours": 24,
+      "max_db_size_mb": 1000,
+      "export_enabled": false,
+      "export_path": "./exports/",
+      "compression": false
+    }
+  }
+}
