@@ -24,8 +24,12 @@ Great for development, testing, demos, or just pretending you have a fully instr
 - 📝 Comprehensive logging (so you know exactly when things go sideways)
 - 🚀 Zero hardware requirements (finally!)
 - **🆕 MQTT Publisher**: Stream real-time tag data to any MQTT broker
+- **🆕 Sparkplug B**: Native Ignition Edge protocol support
+- **🆕 Apache Kafka**: Enterprise-grade data streaming
+- **🆕 AMQP (RabbitMQ)**: Enterprise messaging
+- **🆕 WebSocket**: Real-time browser updates
 - **🆕 REST API**: Query and write tags via HTTP endpoints
-- **🆕 Multi-Protocol**: Run OPC UA, MQTT, and REST API simultaneously
+- **🆕 Multi-Protocol**: Run 7+ protocols simultaneously
 
 ## Quick Start
 
