@@ -41,6 +41,15 @@ try:
 except ImportError:
     WEBSOCKET_AVAILABLE = False
 
+try:
+    from pymodbus.server import StartTcpServer
+    from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
+    from pymodbus.device import ModbusDeviceIdentification
+    import struct
+    MODBUS_AVAILABLE = True
+except ImportError:
+    MODBUS_AVAILABLE = False
+
 
 class DataPublisher(ABC):
     """Base class for all data publishers."""
