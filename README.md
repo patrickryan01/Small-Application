@@ -2,7 +2,7 @@
 > *Because Your Production Environment is Too Precious to Test On*
 > 
 > **By Patrick Ryan, CTO @ Fireball Industries**  
-> *"We put the 'fun' in 'functional testing' (citation needed)"*
+> *"I put the 'fun' in 'functional testing' (citation needed)"*
 
 > Sometimes you need fake industrial data that's more reliable than your actual production environment. This is that.
 
@@ -371,6 +371,7 @@ Found a bug? Have an idea? PRs welcome. Please include:
 - What you changed and why
 - Tests if applicable (we believe in you)
 - Your favorite industrial automation horror story
+- Have an idea? Let me know!
 
 ## License
 
