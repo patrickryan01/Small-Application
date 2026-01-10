@@ -7,9 +7,9 @@
 ## What We Just Built 🎉
 *Or: "My Descent Into Multi-Protocol Madness"*
 
-So... your OPC UA Server now supports **9 industrial data streaming protocols**. 
+So... your OPC UA Server now supports **10 industrial data streaming protocols**. 
 
-Yeah, I know. That's like ordering every sauce at Taco Bell instead of just picking one. But here we are in 2026, and somehow this makes sense:
+Yeah, I know. That's like ordering every sauce at Taco Bell instead of just picking one. But here we are in 2024, and somehow this makes sense:
 
 1. ✅ **OPC UA Server** (original) - SCADA systems connect to you (the OG)
 2. ✅ **OPC UA Client** ⭐ NEW - Push to other OPC UA servers (the sequel nobody asked for but everyone needed)
@@ -20,6 +20,7 @@ Yeah, I know. That's like ordering every sauce at Taco Bell instead of just pick
 7. ✅ **WebSocket** - Real-time web UIs (for those sweet dashboards)
 8. ✅ **REST API** - HTTP clients (the protocol everyone actually understands)
 9. ✅ **MODBUS TCP** - Legacy PLCs and SCADA systems (respect your elders)
+10. ✅ **GraphQL** - Modern query interface (REST's cooler younger sibling)
 
 ## New Files Created
 
