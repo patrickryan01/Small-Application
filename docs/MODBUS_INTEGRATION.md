@@ -1,30 +1,43 @@
 # MODBUS TCP Integration Guide
+> *Because Some PLCs Are Still Living in 1979*
+> 
+> **Patrick Ryan, CTO @ Fireball Industries**  
+> *"I respect MODBUS the way I respect my grandparents - it's old, slow, but somehow still works"*
 
 ## Overview
+*Welcome to Protocol Archaeology*
 
-The OPC UA Server can now act as a **MODBUS TCP Server**, allowing legacy PLCs, SCADA systems, and other MODBUS clients to read tag values using the industry-standard MODBUS protocol.
+The OPC UA Server can now act as a **MODBUS TCP Server**. Yes, MODBUS. The protocol that's older than most developers reading this. But here's the thing - it WORKS, and half the industrial world still runs on it.
+
+Think of this as your time machine to the 1970s, except instead of bell-bottoms and disco, you get registers and function codes. Groovy.
 
 ## What is MODBUS TCP?
+*The Protocol That Refuses to Die*
 
-MODBUS TCP is a widely-used industrial protocol that allows devices to communicate over Ethernet. It's particularly common in:
-- Legacy PLCs (Allen-Bradley, Siemens, Schneider, etc.)
-- SCADA systems (many support MODBUS as a universal driver)
-- HMIs and industrial displays
-- Industrial gateways and data acquisition systems
+MODBUS TCP is like that one friend from high school who peaked early but somehow still shows up to every reunion. It's a widely-used industrial protocol that allows devices to communicate over Ethernet, and it's EVERYWHERE in:
+- Legacy PLCs (Allen-Bradley, Siemens, Schneider, etc.) - Your grandpa's automation
+- SCADA systems (many support MODBUS because... of course they do)
+- HMIs and industrial displays - The touchscreens that take 5 seconds to register a tap
+- Industrial gateways - Protocol translators having an identity crisis
+
+**Fun fact:** MODBUS was created in 1979. That's the same year as the Sony Walkman and Alien. One of these aged better than the others.
 
 ## How It Works
+*The Magic of Ancient Technology*
 
 ```
 OPC UA Server (with MODBUS TCP Publisher)
     ↓
-Acts as MODBUS TCP Server (Slave)
+Acts as MODBUS TCP Server (Slave) - Yes, we still use that term in 2026 🙃
     ↓
-Listens on port 502 (standard MODBUS port)
+Listens on port 502 (standard MODBUS port, which requires root on Linux because reasons)
     ↓
-MODBUS Clients (PLCs, SCADA) poll registers
+MODBUS Clients (PLCs, SCADA) poll registers - Like constantly asking "are we there yet?"
     ↓
-Read current tag values from holding registers
+Read current tag values from holding registers - And that's it. Simple. Brutally simple.
 ```
+
+**MODBUS in a nutshell:** It's like HTTP if HTTP was invented before HTTP and also hated you.
 
 ## Configuration
 
@@ -513,16 +526,23 @@ pip install pymodbus
 ## Next Steps
 
 1. ✅ Start server with MODBUS TCP enabled
-2. ✅ Test with pymodbus or GUI tool
-3. ✅ Document register mapping for your team
+2. ✅ Test with pymodbus or GUI tool (QModMaster is solid)
+3. ✅ Document register mapping for your team (future you will thank you)
 4. ✅ Configure MODBUS clients (PLCs, SCADA)
 5. ✅ Monitor performance and adjust poll rates
 
 ## Resources
 
-- [MODBUS Protocol Specification](https://www.modbus.org/specs.php)
-- [pymodbus Documentation](https://pymodbus.readthedocs.io/)
-- [ModbusPoll Download](https://www.modbustools.com/modpoll.html)
-- [QModMaster](https://github.com/Ed-Charbonneau/qmodmaster)
+- [MODBUS Protocol Specification](https://www.modbus.org/specs.php) - The sacred texts
+- [pymodbus Documentation](https://pymodbus.readthedocs.io/) - Python library that actually works
+- [ModbusPoll Download](https://www.modbustools.com/modpoll.html) - Commercial but worth it
+- [QModMaster](https://github.com/Ed-Charbonneau/qmodmaster) - Free and open source
 
 Your OPC UA Server can now communicate with legacy MODBUS systems! 🎉
+
+---
+
+**Patrick Ryan @ Fireball Industries**  
+*"MODBUS: The protocol that refuses to die (and honestly, respect)"*
+
+*P.S. - If you're reading this in 2030 and MODBUS is STILL everywhere, the drinks are on me.*

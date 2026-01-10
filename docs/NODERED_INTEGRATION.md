@@ -1,14 +1,23 @@
 # Node-RED Integration Guide
+> *Low-Code for People Who Actually Code*
+> 
+> **Patrick Ryan @ Fireball Industries**  
+> *"Node-RED: Because sometimes you want to prototype faster than your coffee can brew"*
 
 ## Overview
+*Visual Programming for the Rest of Us*
 
-Node-RED is perfect for prototyping, IoT integrations, and data processing. This OPC UA Server can feed data to Node-RED using multiple protocols.
+Node-RED is perfect for prototyping, IoT integrations, and that weird one-off project your boss wants "by tomorrow." It's like Scratch for adults who know what an API is. This OPC UA Server can feed data to Node-RED using multiple protocols, because of course it can.
+
+Think of Node-RED as industrial automation's answer to "can we make this work without writing actual code?" (Spoiler: yes, but you'll probably write JavaScript anyway)
 
 ## Integration Methods
+*Pick Your Poison*
 
 ### Method 1: MQTT (RECOMMENDED)
+*The "It Just Works™" Approach*
 
-MQTT provides the best balance of simplicity and performance for Node-RED.
+MQTT provides the best balance of simplicity and performance for Node-RED. It's like choosing vanilla ice cream - boring, reliable, and nobody's going to complain.
 
 #### Setup Steps
 
@@ -561,11 +570,18 @@ OPC UA Server → Node-RED → Switch (Alert) → Telegram Bot
 
 ## Next Steps
 
-1. ✅ Install Node-RED
+1. ✅ Install Node-RED (and Node.js if you haven't already)
 2. ✅ Start OPC UA Server with MQTT/WebSocket
 3. ✅ Create basic flow to subscribe to tags
 4. ✅ Build dashboard with gauges and charts
-5. ✅ Add alerting and data logging
-6. ✅ Deploy to production
+5. ✅ Add alerting and data logging (because why not)
+6. ✅ Deploy to production (aka leave it running on your laptop)
 
 Your OPC UA Server is now integrated with Node-RED! 🎉
+
+---
+
+**Patrick Ryan @ Fireball Industries**  
+*"Node-RED: For when you want to prototype on a Tuesday and deploy by Friday"*
+
+*Now go wire up those nodes. You got this.*

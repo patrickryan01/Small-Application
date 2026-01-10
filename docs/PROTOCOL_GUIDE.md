@@ -1,21 +1,29 @@
 # Industrial Data Streaming Protocols - Complete Guide
+> *The "Why Can't We Just Pick ONE Protocol?" Reference*
+> 
+> **Patrick Ryan, Fireball Industries CTO**  
+> *Protocol collector and industrial therapy provider since 2025*
 
 ## Overview
+*Welcome to Protocol Paradise (or Hell, Depending on Your Day)*
 
 This document explains all industrial data streaming protocols, their use cases, and implementation status in this OPC UA Server.
 
-## Implemented Protocols ✅
+Look, I get it. You're probably thinking "Why do we need 9 different protocols?" The short answer is: because industrial automation is a beautiful disaster of legacy systems, vendor lock-in, and "we've always done it this way." The long answer is... also that, but with more acronyms.
 
-### 1. OPC UA (Original)
+## Implemented Protocols ✅
+*The Whole Circus*
+
+### 1. OPC UA Server (Original)
 **Status:** ✅ Fully Implemented
 
-**What it is:** Industry-standard protocol for industrial automation
+**What it is:** Industry-standard protocol for industrial automation (aka "the one everyone pretends to understand")
 
 **Use Cases:**
-- SCADA systems (Ignition, Wonderware, etc.)
-- MES/ERP integrations
-- PLC communications
-- Legacy industrial systems
+- SCADA systems (Ignition, Wonderware, etc.) - The big boys
+- MES/ERP integrations - Enterprise software that costs more than your car
+- PLC communications - Talking to robots, basically
+- Legacy industrial systems - That PLC from 2003 that no one dares touch
 
 **Configuration:**
 ```json
@@ -31,13 +39,13 @@ This document explains all industrial data streaming protocols, their use cases,
 ### 2. MQTT
 **Status:** ✅ Fully Implemented
 
-**What it is:** Lightweight publish/subscribe messaging protocol
+**What it is:** Lightweight publish/subscribe messaging protocol (IoT's favorite child)
 
 **Use Cases:**
-- IoT devices
-- Cloud integration
-- Mobile apps
-- Microservices
+- IoT devices - Your smart toaster, probably
+- Cloud integration - Because "cloud" = magic
+- Mobile apps - For when you need to check factory temps from the beach
+- Microservices - Buzzword compliance ✅
 
 **Configuration:**
 ```json
