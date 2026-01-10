@@ -1,0 +1,112 @@
+{
+  "tags": {
+    "Temperature": {
+      "type": "float",
+      "initial_value": 20.0,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 15.0,
+      "max": 25.0,
+      "description": "Ambient temperature in Celsius"
+    },
+    "Pressure": {
+      "type": "float",
+      "initial_value": 101.3,
+      "simulate": true,
+      "simulation_type": "random",
+      "min": 99.0,
+      "max": 103.0,
+      "description": "System pressure in kPa"
+    },
+    "FlowRate": {
+      "type": "float",
+      "initial_value": 100.0,
+      "simulate": true,
+      "simulation_type": "sine",
+      "amplitude": 20.0,
+      "offset": 100.0,
+      "period": 30,
+      "description": "Flow rate with sine wave pattern"
+    },
+    "Counter": {
+      "type": "int",
+      "initial_value": 0,
+      "simulate": true,
+      "simulation_type": "increment",
+      "increment": 1,
+      "max": 1000,
+      "reset_on_max": true,
+      "description": "Production counter with rollover"
+    },
+    "Status": {
+      "type": "string",
+      "initial_value": "Running",
+      "simulate": false,
+      "description": "System status message"
+    },
+    "IsRunning": {
+      "type": "bool",
+      "initial_value": true,
+      "simulate": false,
+      "description": "System running flag"
+    }
+  },
+  "publishers": {
+    "mqtt": {
+      "enabled": false,
+      "broker": "localhost",
+      "port": 1883,
+      "client_id": "opcua_server",
+      "username": "",
+      "password": "",
+      "use_tls": false,
+      "topic_prefix": "industrial/opcua",
+      "command_topic": "industrial/opcua/commands",
+      "payload_format": "json",
+      "qos": 1,
+      "retain": false
+    },
+    "sparkplug_b": {
+      "enabled": true,
+      "broker": "localhost",
+      "port": 1883,
+      "username": "",
+      "password": "",
+      "group_id": "Sparkplug B Devices",
+      "edge_node_id": "OPC_UA_Gateway",
+      "device_id": "EdgeDevice",
+      "description": "Sparkplug B protocol for Ignition Edge"
+    },
+    "kafka": {
+      "enabled": false,
+      "bootstrap_servers": ["localhost:9092"],
+      "topic": "industrial-data",
+      "compression": "gzip",
+      "description": "Apache Kafka for enterprise streaming"
+    },
+    "amqp": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 5672,
+      "username": "guest",
+      "password": "guest",
+      "virtual_host": "/",
+      "exchange": "industrial.data",
+      "exchange_type": "topic",
+      "routing_key_prefix": "opcua",
+      "description": "AMQP (RabbitMQ) for enterprise messaging"
+    },
+    "websocket": {
+      "enabled": false,
+      "host": "0.0.0.0",
+      "port": 9001,
+      "description": "WebSocket for real-time browser updates"
+    },
+    "rest_api": {
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 5000,
+      "description": "REST API for HTTP clients"
+    }
+  }
+}
