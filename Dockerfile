@@ -6,24 +6,30 @@ LABEL maintainer="patrick@fireball-industries.com"
 
 WORKDIR /app
 
-# Install dependencies
+# Install git and build dependencies
 RUN apt-get update && apt-get install -y \
-    gcc g++ libxml2-dev libxslt-dev libssl-dev \
+    git \
+    gcc g++ \
+    libxml2-dev libxslt-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-RUN mkdir -p /app/data && \
-    useradd -m -u 1000 emberburn && \
+# Create non-root user
+RUN useradd -m -u 1000 emberburn && \
+    mkdir -p /app/data && \
     chown -R emberburn:emberburn /app
 
 USER emberburn
 
 EXPOSE 4840 5000 8000
 
-ENV PYTHONUNBUFFERED=1 UPDATE_INTERVAL=2.0 LOG_LEVEL=INFO
+ENV PYTHONUNBUFFERED=1 \
+    UPDATE_INTERVAL=2.0 \
+    LOG_LEVEL=INFO \
+    REPO_URL=https://github.com/fireball-industries/Small-Application.git \
+    REPO_BRANCH=main
 
-CMD ["python", "main.py"]
+# Entrypoint script that clones code and runs it
+COPY --chown=emberburn:emberburn entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
