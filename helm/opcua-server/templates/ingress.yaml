@@ -1,12 +1,11 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "opcua-server.fullname" . -}}
-{{- $svcPort := .Values.service.rest.port -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $fullName }}
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
+    {{- include "emberburn.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -35,9 +34,9 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ $fullName }}
+                name: {{ include "emberburn.fullname" $ }}
                 port:
-                  number: {{ $svcPort }}
+                  number: {{ $.Values.service.webui.port }}
           {{- end }}
     {{- end }}
 {{- end }}

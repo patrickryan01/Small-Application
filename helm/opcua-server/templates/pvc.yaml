@@ -1,38 +1,22 @@
-{{- /*
-PersistentVolumeClaims for data and logs
-Because losing your SQLite database is bad for business
-*/ -}}
-{{- if .Values.persistence.enabled }}
----
+{{- if .Values.persistence.enabled -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "opcua-server.fullname" . }}-data
+  name: {{ include "emberburn.pvcName" . }}
+  namespace: {{ include "emberburn.namespace" . }}
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
+    {{- include "emberburn.labels" . | nindent 4 }}
+  {{- with .Values.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.persistence.size }}
-  {{- if .Values.persistence.storageClass }}
-  storageClassName: {{ .Values.persistence.storageClass }}
-  {{- end }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "opcua-server.fullname" . }}-logs
-  labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
-spec:
-  accessModes:
-    - {{ .Values.persistence.accessMode }}
-  resources:
-    requests:
-      storage: 1Gi
-  {{- if .Values.persistence.storageClass }}
-  storageClassName: {{ .Values.persistence.storageClass }}
-  {{- end }}
 {{- end }}

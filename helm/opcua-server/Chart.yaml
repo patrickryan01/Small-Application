@@ -1,63 +1,67 @@
-# Helm Chart for OPC UA Multi-Protocol Server
-# Because Rancher UI Store needs proper metadata
-# 
-# Patrick Ryan's Helm Chart
-# "It's like a recipe, but for Kubernetes"
-
 apiVersion: v2
-name: opcua-server
-description: >
-  OPC UA Server with 15 protocols for industrial data streaming.
-  Supports MQTT, Sparkplug B, Kafka, AMQP, WebSocket, REST API, GraphQL, 
-  MODBUS TCP, InfluxDB, Alarms, OPC UA Client, Prometheus, SQLite, 
-  Data Transformation, and a beautiful Web UI. Because apparently that's a thing.
+name: emberburn
+description: |
+  OPC UA Industrial IoT Gateway with 15 protocol support and fire-themed web UI.
+  Because your industrial data deserves to be as hot as your infrastructure.
+  
+  EmberBurn is a multi-protocol industrial IoT gateway featuring OPC UA server,
+  MQTT, REST API, GraphQL, Sparkplug B, Kafka, AMQP, WebSocket, Modbus TCP,
+  Prometheus metrics, InfluxDB integration, alarms, data transformation, SQLite
+  persistence, and a beautiful Python Flask web UI for configuration and monitoring.
 
-# Chart metadata
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
 
-# Maintainer info
-maintainers:
-  - name: Patrick Ryan
-    email: patrick@fireballindustries.com
-    url: https://github.com/your-repo
-
-# Keywords for Rancher catalog search
 keywords:
   - opcua
-  - opc-ua
-  - industrial
-  - iot
-  - mqtt
-  - sparkplug
-  - kafka
+  - industrial-iot
   - scada
-  - plc
+  - mqtt
   - modbus
-  - influxdb
   - prometheus
-  - grafana
-  - ignition
+  - graphql
+  - data-transformation
+  - emberburn
+  - fireball-industries
+  - forge-industrial
 
-# Sources
+home: https://fireballz.ai/emberburn
 sources:
-  - https://github.com/your-repo/opcua-server
+  - https://github.com/fireball-industries/helm-charts
+  - https://github.com/fireball-industries/Small-Application
 
-# Icon for Rancher UI (optional but looks professional)
-icon: https://raw.githubusercontent.com/your-repo/opcua-server/main/docs/icon.png
+maintainers:
+  - name: Patrick Ryan
+    email: patrick@fireball-industries.com
+    url: https://fireballz.ai
 
-# Minimum Kubernetes version
-kubeVersion: ">=1.19.0"
+icon: https://fireballindustries.com/assets/emberburn-icon.svg
 
-# Dependencies (none for now, but could add if needed)
-# dependencies:
-#   - name: postgresql
-#     version: 12.1.0
-#     repository: https://charts.bitnami.com/bitnami
-#     condition: postgresql.enabled
-
-# Annotations for Rancher catalog
+# Rancher Questions Annotation
 annotations:
-  category: IoT
-  licenses: MIT
+  catalog.cattle.io/certified: "fireball"
+  catalog.cattle.io/release-name: "emberburn"
+  catalog.cattle.io/display-name: "EmberBurn - Multi-Protocol IoT Gateway"
+  catalog.cattle.io/provides-gvr: "apps/v1/Deployment"
+  catalog.cattle.io/namespace: "emberburn"
+  catalog.cattle.io/os: "linux"
+  catalog.cattle.io/kube-version: ">=1.25.0"
+  catalog.cattle.io/rancher-version: ">=2.6.0"
+  
+  # Auto-install behavior
+  catalog.cattle.io/auto-install: "emberburn=match"
+  
+  # UI Categories
+  catalog.cattle.io/categories: "Forge Industrial,IoT Gateway,SCADA,OPC UA,Monitoring"
+  
+  # Feature highlights
+  catalog.cattle.io/featured: "true"
+  catalog.cattle.io/hidden: "false"
+  
+  # Documentation links
+  catalog.cattle.io/upstream-version: "1.0.0"
+  fireball.industries/project-type: "industrial-iot-gateway"
+  fireball.industries/protocols: "15"
+  fireball.industries/web-ui: "true"
+  fireball.industries/branding: "emberburn"

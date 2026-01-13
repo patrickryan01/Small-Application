@@ -1,0 +1,28 @@
+# Web UI / REST API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
+  labels:
+    {{- include "emberburn.labels" . | nindent 4 }}
+    service-type: webui
+    {{- with .Values.service.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.webui.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.webui.type }}
+  ports:
+  - name: webui
+    port: {{ .Values.service.webui.port }}
+    targetPort: {{ .Values.service.webui.targetPort }}
+    protocol: {{ .Values.service.webui.protocol }}
+    {{- if and (eq .Values.service.webui.type "NodePort") .Values.service.webui.nodePort }}
+    nodePort: {{ .Values.service.webui.nodePort }}
+    {{- end }}
+  selector:
+    {{- include "emberburn.selectorLabels" . | nindent 4 }}

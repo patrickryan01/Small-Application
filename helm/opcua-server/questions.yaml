@@ -1,278 +1,386 @@
-# Rancher Questions for OPC UA Server
-# This creates the nice UI forms in Rancher
-# Patrick Ryan - "Making YAML bearable since 2026"
-
-categories:
-  - IoT
-  - Industrial
-  - Monitoring
-
 questions:
-# Image Configuration
-- variable: image.repository
-  default: "your-registry.com/opcua-server"
-  description: "Docker image repository (update with your registry)"
+# Namespace Configuration
+- variable: namespace.name
+  label: Namespace
+  description: "Kubernetes namespace for EmberBurn deployment"
   type: string
+  default: "emberburn"
   required: true
-  label: Container Image Repository
-  group: "Container Settings"
+  group: "Namespace Settings"
 
-- variable: image.tag
+- variable: namespace.create
+  label: Create Namespace
+  description: "Create the namespace if it doesn't exist"
+  type: boolean
+  default: true
+  group: "Namespace Settings"
+
+# RBAC Configuration
+- variable: rbac.create
+  label: Create RBAC Resources
+  description: "Create Role and RoleBinding for EmberBurn service account (recommended)"
+  type: boolean
+  default: true
+  group: "Security"
+
+# EmberBurn Configuration
+- variable: emberburn.image.tag
+  label: EmberBurn Version
+  description: "EmberBurn version to deploy"
+  type: string
   default: "1.0.0"
-  description: "Image tag to deploy"
-  type: string
   required: true
-  label: Image Tag
-  group: "Container Settings"
+  group: "EmberBurn Settings"
 
-- variable: image.pullPolicy
-  default: "IfNotPresent"
-  description: "Image pull policy"
-  type: enum
-  label: Pull Policy
-  group: "Container Settings"
-  options:
-    - "IfNotPresent"
-    - "Always"
-    - "Never"
-
-# OPC UA Configuration
-- variable: opcua.updateInterval
-  default: 2.0
-  description: "Tag update interval in seconds"
-  type: float
-  required: true
+- variable: emberburn.opcua.updateInterval
   label: Update Interval (seconds)
-  group: "OPC UA Settings"
+  description: "How often to update tag values (seconds)"
+  type: string
+  default: "2.0"
+  required: true
+  group: "EmberBurn Settings"
 
-- variable: opcua.logLevel
-  default: "INFO"
-  description: "Logging level"
-  type: enum
+- variable: emberburn.opcua.logLevel
   label: Log Level
-  group: "OPC UA Settings"
+  description: "Logging verbosity"
+  type: enum
+  default: "INFO"
+  required: true
+  group: "EmberBurn Settings"
   options:
     - "DEBUG"
     - "INFO"
     - "WARNING"
     - "ERROR"
+    - "CRITICAL"
 
-# Service Configuration
-- variable: service.type
-  default: "ClusterIP"
-  description: "Kubernetes service type"
+# Resource Presets
+- variable: emberburn.resources.preset
+  label: Resource Preset
+  description: "Choose a resource allocation preset or select custom"
   type: enum
-  label: Service Type
-  group: "Networking"
+  default: "medium"
+  required: true
+  group: "Resources"
+  options:
+    - "small"
+    - "medium"
+    - "large"
+    - "custom"
+  show_subquestion_if: "custom"
+  subquestions:
+    - variable: emberburn.resources.custom.requests.cpu
+      label: CPU Request
+      description: "Guaranteed CPU (e.g., 250m = 0.25 cores)"
+      type: string
+      default: "250m"
+    
+    - variable: emberburn.resources.custom.requests.memory
+      label: Memory Request
+      description: "Guaranteed memory (e.g., 512Mi)"
+      type: string
+      default: "512Mi"
+    
+    - variable: emberburn.resources.custom.limits.cpu
+      label: CPU Limit
+      description: "Maximum CPU (e.g., 1000m = 1 core)"
+      type: string
+      default: "1000m"
+    
+    - variable: emberburn.resources.custom.limits.memory
+      label: Memory Limit
+      description: "Maximum memory (e.g., 2Gi)"
+      type: string
+      default: "2Gi"
+
+# Storage Configuration
+- variable: persistence.enabled
+  label: Enable Persistent Storage
+  description: "Store data, logs, and SQLite database persistently (REQUIRED for data persistence)"
+  type: boolean
+  default: true
+  required: true
+  group: "Storage"
+  show_subquestion_if: true
+  subquestions:
+    - variable: persistence.size
+      label: Storage Size
+      description: "Size of persistent volume (e.g., 10Gi, 20Gi, 50Gi)"
+      type: string
+      default: "10Gi"
+      required: true
+    
+    - variable: persistence.storageClass
+      label: Storage Class
+      description: "Storage class name (leave empty for default)"
+      type: storageclass
+      default: ""
+
+# Web UI Service Configuration
+- variable: service.webui.type
+  label: Web UI Service Type
+  description: "How to expose the EmberBurn Web UI"
+  type: enum
+  default: "LoadBalancer"
+  required: true
+  group: "Service & Networking"
+  options:
+    - "ClusterIP"
+    - "NodePort"
+    - "LoadBalancer"
+  show_subquestion_if: "NodePort"
+  subquestions:
+    - variable: service.webui.nodePort
+      label: Web UI Node Port
+      description: "Port on each node (30000-32767, leave empty for auto-assign)"
+      type: int
+      min: 30000
+      max: 32767
+
+- variable: service.webui.port
+  label: Web UI Port
+  description: "External port for Web UI and REST API"
+  type: int
+  default: 5000
+  required: true
+  group: "Service & Networking"
+
+# OPC UA Service Configuration
+- variable: service.opcua.type
+  label: OPC UA Service Type
+  description: "How to expose the OPC UA server (typically ClusterIP for internal)"
+  type: enum
+  default: "ClusterIP"
+  required: true
+  group: "Service & Networking"
   options:
     - "ClusterIP"
     - "NodePort"
     - "LoadBalancer"
 
-- variable: service.opcua.port
-  default: 4840
-  description: "OPC UA server port"
-  type: int
-  label: OPC UA Port
-  group: "Networking"
-
-- variable: service.rest.port
-  default: 5000
-  description: "REST API / Web UI port"
-  type: int
-  label: Web UI Port
-  group: "Networking"
-
 # Ingress Configuration
 - variable: ingress.enabled
-  default: false
-  description: "Enable ingress for external web access"
-  type: boolean
   label: Enable Ingress
-  group: "Networking"
-  show_subquestion_if: true
-  subquestions:
-  - variable: ingress.className
-    default: "nginx"
-    description: "Ingress class name"
-    type: string
-    label: Ingress Class
-  - variable: ingress.hosts[0].host
-    default: "opcua.local"
-    description: "Hostname for web UI access"
-    type: hostname
-    label: Ingress Hostname
-  - variable: ingress.tls[0].secretName
-    default: "opcua-tls"
-    description: "TLS secret name (cert-manager)"
-    type: string
-    label: TLS Secret Name
-
-# Resource Limits
-- variable: resources.requests.cpu
-  default: "100m"
-  description: "CPU request"
-  type: string
-  label: CPU Request
-  group: "Resources"
-
-- variable: resources.requests.memory
-  default: "256Mi"
-  description: "Memory request"
-  type: string
-  label: Memory Request
-  group: "Resources"
-
-- variable: resources.limits.cpu
-  default: "1000m"
-  description: "CPU limit"
-  type: string
-  label: CPU Limit
-  group: "Resources"
-
-- variable: resources.limits.memory
-  default: "1Gi"
-  description: "Memory limit"
-  type: string
-  label: Memory Limit
-  group: "Resources"
-
-# Persistence
-- variable: persistence.enabled
-  default: true
-  description: "Enable persistent storage for SQLite database"
+  description: "Expose EmberBurn Web UI via ingress controller (requires ingress controller installed)"
   type: boolean
-  label: Enable Persistence
-  group: "Storage"
+  default: false
+  group: "Service & Networking"
   show_subquestion_if: true
   subquestions:
-  - variable: persistence.size
-    default: "10Gi"
-    description: "Persistent volume size"
-    type: string
-    label: Storage Size
-  - variable: persistence.storageClass
-    default: ""
-    description: "Storage class (leave empty for default)"
-    type: storageclass
-    label: Storage Class
-  - variable: persistence.accessMode
-    default: "ReadWriteOnce"
-    description: "Access mode"
-    type: enum
-    label: Access Mode
-    options:
-      - "ReadWriteOnce"
-      - "ReadWriteMany"
+    - variable: ingress.className
+      label: Ingress Class
+      description: "Ingress controller to use (e.g., nginx, traefik)"
+      type: string
+      default: "nginx"
+    
+    - variable: ingress.hosts[0].host
+      label: Hostname
+      description: "Domain name for EmberBurn (e.g., emberburn.example.com)"
+      type: hostname
+      default: "emberburn.local"
+      required: true
+    
+    - variable: ingress.tls[0].enabled
+      label: Enable TLS/SSL
+      description: "Enable HTTPS with TLS certificate"
+      type: boolean
+      default: false
+    
+    - variable: ingress.tls[0].secretName
+      label: TLS Secret Name
+      description: "Name of secret containing TLS certificate"
+      type: secret
+      default: "emberburn-tls"
+      show_if: "ingress.tls[0].enabled=true"
+
+# Protocol Configuration
+- variable: config.publishers.mqtt.enabled
+  label: Enable MQTT Publisher
+  description: "Publish tag data to MQTT broker"
+  type: boolean
+  default: false
+  group: "Protocols"
+  show_subquestion_if: true
+  subquestions:
+    - variable: config.publishers.mqtt.broker
+      label: MQTT Broker Address
+      description: "MQTT broker hostname or IP (e.g., mosquitto.default.svc.cluster.local)"
+      type: string
+      default: "mosquitto.default.svc.cluster.local"
+      required: true
+    
+    - variable: config.publishers.mqtt.port
+      label: MQTT Port
+      description: "MQTT broker port"
+      type: int
+      default: 1883
+      required: true
+    
+    - variable: config.publishers.mqtt.topic_prefix
+      label: Topic Prefix
+      description: "MQTT topic prefix (e.g., industrial/emberburn)"
+      type: string
+      default: "industrial/emberburn"
+
+- variable: config.publishers.influxdb.enabled
+  label: Enable InfluxDB Storage
+  description: "Store historical data in InfluxDB"
+  type: boolean
+  default: false
+  group: "Protocols"
+  show_subquestion_if: true
+  subquestions:
+    - variable: config.publishers.influxdb.url
+      label: InfluxDB URL
+      description: "InfluxDB server URL (e.g., http://influxdb.default.svc.cluster.local:8086)"
+      type: string
+      default: "http://influxdb.default.svc.cluster.local:8086"
+      required: true
+    
+    - variable: config.publishers.influxdb.bucket
+      label: Bucket Name
+      description: "InfluxDB bucket name"
+      type: string
+      default: "emberburn"
+      required: true
+    
+    - variable: config.publishers.influxdb.token
+      label: Access Token
+      description: "InfluxDB access token (leave empty if no auth)"
+      type: password
+      default: ""
+
+- variable: config.publishers.sparkplug.enabled
+  label: Enable Sparkplug B
+  description: "Enable Sparkplug B protocol (Ignition Edge compatibility)"
+  type: boolean
+  default: false
+  group: "Protocols"
+  show_subquestion_if: true
+  subquestions:
+    - variable: config.publishers.sparkplug.broker
+      label: MQTT Broker Address
+      description: "MQTT broker for Sparkplug B"
+      type: string
+      default: "mosquitto.default.svc.cluster.local"
+      required: true
+    
+    - variable: config.publishers.sparkplug.group_id
+      label: Group ID
+      description: "Sparkplug B Group ID"
+      type: string
+      default: "Fireball"
+      required: true
+    
+    - variable: config.publishers.sparkplug.edge_node_id
+      label: Edge Node ID
+      description: "Sparkplug B Edge Node ID"
+      type: string
+      default: "EmberBurn"
+      required: true
+
+# Data Features
+- variable: config.publishers.prometheus.enabled
+  label: Enable Prometheus Metrics
+  description: "Expose operational metrics for Prometheus scraping"
+  type: boolean
+  default: true
+  group: "Monitoring & Data"
+
+- variable: config.publishers.sqlite_persistence.enabled
+  label: Enable SQLite Persistence
+  description: "Store historical tag values and audit logs in SQLite database"
+  type: boolean
+  default: true
+  group: "Monitoring & Data"
+
+- variable: config.publishers.data_transformation.enabled
+  label: Enable Data Transformation
+  description: "Enable unit conversions, scaling, and computed tags"
+  type: boolean
+  default: true
+  group: "Monitoring & Data"
+
+- variable: config.publishers.alarms.enabled
+  label: Enable Alarms
+  description: "Enable threshold-based alarms and notifications"
+  type: boolean
+  default: true
+  group: "Monitoring & Data"
+  show_subquestion_if: true
+  subquestions:
+    - variable: config.publishers.alarms.check_interval
+      label: Check Interval (seconds)
+      description: "How often to check alarm conditions"
+      type: int
+      default: 5
+      required: true
+
+# Advanced Settings
+- variable: autoscaling.enabled
+  label: Enable Horizontal Pod Autoscaler
+  description: "Automatically scale based on CPU/memory usage (advanced)"
+  type: boolean
+  default: false
+  group: "Advanced"
+  show_subquestion_if: true
+  subquestions:
+    - variable: autoscaling.minReplicas
+      label: Minimum Replicas
+      description: "Minimum number of pods"
+      type: int
+      default: 1
+      required: true
+    
+    - variable: autoscaling.maxReplicas
+      label: Maximum Replicas
+      description: "Maximum number of pods"
+      type: int
+      default: 3
+      required: true
+    
+    - variable: autoscaling.targetCPUUtilizationPercentage
+      label: Target CPU %
+      description: "Target CPU utilization percentage"
+      type: int
+      default: 80
+      required: true
+
+- variable: nodeSelector
+  label: Node Selector
+  description: "Schedule pod on nodes with specific labels (key=value format)"
+  type: map[string]string
+  default: {}
+  group: "Advanced"
 
 # Monitoring
-- variable: serviceMonitor.enabled
-  default: false
-  description: "Enable Prometheus ServiceMonitor (requires prometheus-operator)"
+- variable: monitoring.enabled
+  label: Enable Monitoring
+  description: "Enable Prometheus ServiceMonitor for metrics collection"
   type: boolean
-  label: Enable Prometheus Monitoring
-  group: "Monitoring"
-  show_subquestion_if: true
-  subquestions:
-  - variable: serviceMonitor.interval
-    default: "30s"
-    description: "Scrape interval"
-    type: string
-    label: Scrape Interval
-
-# Publishers Configuration
-- variable: mqtt.enabled
   default: false
-  description: "Enable MQTT publisher"
-  type: boolean
-  label: Enable MQTT
-  group: "Publishers"
-  show_subquestion_if: true
-  subquestions:
-  - variable: mqtt.broker
-    default: "mosquitto.default.svc.cluster.local"
-    description: "MQTT broker address"
-    type: string
-    label: MQTT Broker
-  - variable: mqtt.port
-    default: 1883
-    description: "MQTT broker port"
-    type: int
-    label: MQTT Port
-  - variable: mqtt.topicPrefix
-    default: "industrial/opcua"
-    description: "MQTT topic prefix"
-    type: string
-    label: Topic Prefix
+  group: "Monitoring & Data"
 
-- variable: influxdb.enabled
+- variable: monitoring.serviceMonitor.enabled
+  label: Create ServiceMonitor
+  description: "Create Prometheus ServiceMonitor resource (requires Prometheus Operator)"
+  type: boolean
   default: false
-  description: "Enable InfluxDB publisher"
-  type: boolean
-  label: Enable InfluxDB
-  group: "Publishers"
-  show_subquestion_if: true
-  subquestions:
-  - variable: influxdb.url
-    default: "http://influxdb.default.svc.cluster.local:8086"
-    description: "InfluxDB URL"
-    type: string
-    label: InfluxDB URL
-  - variable: influxdb.org
-    default: "default"
-    description: "InfluxDB organization"
-    type: string
-    label: Organization
-  - variable: influxdb.bucket
-    default: "sensors"
-    description: "InfluxDB bucket name"
-    type: string
-    label: Bucket Name
+  group: "Monitoring & Data"
+  show_if: "monitoring.enabled=true"
 
-# Multi-tenancy
-- variable: multitenancy.enabled
+# Pod Disruption Budget
+- variable: podDisruptionBudget.enabled
+  label: Enable Pod Disruption Budget
+  description: "Prevent voluntary disruptions during cluster maintenance"
+  type: boolean
   default: false
-  description: "Enable multi-tenancy mode"
+  group: "High Availability"
+
+# Network Policy
+- variable: networkPolicy.enabled
+  label: Enable Network Policy
+  description: "Restrict network traffic to/from EmberBurn pod"
   type: boolean
-  label: Multi-Tenancy Mode
-  group: "Multi-Tenancy"
-  show_subquestion_if: true
-  subquestions:
-  - variable: multitenancy.namespace
-    default: ""
-    description: "Tenant namespace (leave empty to use current)"
-    type: string
-    label: Tenant Namespace
-
-# Advanced Configuration
-- variable: config.tags
-  default: |
-    {
-      "Temperature": {
-        "type": "float",
-        "initial_value": 20.0,
-        "simulate": true,
-        "simulation_type": "random",
-        "min": 15.0,
-        "max": 25.0,
-        "units": "°C"
-      }
-    }
-  description: "Tag configuration (JSON format)"
-  type: multiline
-  label: Tag Configuration
-  group: "Configuration"
-
-- variable: config.publishers
-  default: |
-    {
-      "rest_api": {
-        "enabled": true,
-        "host": "0.0.0.0",
-        "port": 5000
-      }
-    }
-  description: "Publisher configuration (JSON format)"
-  type: multiline
-  label: Publisher Configuration
-  group: "Configuration"
+  default: false
+  group: "Security"

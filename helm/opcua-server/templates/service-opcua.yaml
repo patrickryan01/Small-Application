@@ -1,0 +1,25 @@
+# OPC UA Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "emberburn.fullname" . }}-opcua
+  namespace: {{ include "emberburn.namespace" . }}
+  labels:
+    {{- include "emberburn.labels" . | nindent 4 }}
+    service-type: opcua
+    {{- with .Values.service.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.opcua.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.opcua.type }}
+  ports:
+  - name: opcua
+    port: {{ .Values.service.opcua.port }}
+    targetPort: {{ .Values.service.opcua.targetPort }}
+    protocol: {{ .Values.service.opcua.protocol }}
+  selector:
+    {{- include "emberburn.selectorLabels" . | nindent 4 }}

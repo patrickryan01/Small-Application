@@ -1,0 +1,16 @@
+{{- if .Values.podDisruptionBudget.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
+  labels:
+    {{- include "emberburn.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "emberburn.selectorLabels" . | nindent 6 }}
+{{- end }}

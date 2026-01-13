@@ -1,0 +1,174 @@
+1. Get the EmberBurn Web UI URL by running these commands:
+{{- if .Values.ingress.enabled }}
+  {{- range $host := .Values.ingress.hosts }}
+    {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+    {{- end }}
+  {{- end }}
+{{- else if contains "NodePort" .Values.service.webui.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ include "emberburn.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "emberburn.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ include "emberburn.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "EmberBurn Web UI: http://$NODE_IP:$NODE_PORT"
+{{- else if contains "LoadBalancer" .Values.service.webui.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status by running:
+        
+        kubectl --namespace {{ include "emberburn.namespace" . }} get services -w {{ include "emberburn.fullname" . }}
+  
+  export SERVICE_IP=$(kubectl get svc --namespace {{ include "emberburn.namespace" . }} {{ include "emberburn.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "EmberBurn Web UI: http://$SERVICE_IP:{{ .Values.service.webui.port }}"
+{{- else if contains "ClusterIP" .Values.service.webui.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ include "emberburn.namespace" . }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  echo "EmberBurn Web UI: http://127.0.0.1:5000"
+  kubectl --namespace {{ include "emberburn.namespace" . }} port-forward $POD_NAME 5000:5000
+{{- end }}
+
+2. OPC UA Server Connection:
+
+   Endpoint: opc.tcp://{{ include "emberburn.fullname" . }}-opcua.{{ include "emberburn.namespace" . }}.svc.cluster.local:4840/freeopcua/server/
+   
+   {{- if eq .Values.service.opcua.type "LoadBalancer" }}
+   External Endpoint (after LoadBalancer provisioned):
+   export OPCUA_IP=$(kubectl get svc --namespace {{ include "emberburn.namespace" . }} {{ include "emberburn.fullname" . }}-opcua --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+   echo "OPC UA: opc.tcp://$OPCUA_IP:4840/freeopcua/server/"
+   {{- end }}
+
+3. Enabled Protocols:
+
+   ✓ OPC UA Server - Port 4840
+   ✓ Web UI / REST API - Port 5000
+   ✓ Prometheus Metrics - Port 8000
+   {{- if .Values.config.publishers.mqtt.enabled }}
+   ✓ MQTT Publisher - {{ .Values.config.publishers.mqtt.broker }}:{{ .Values.config.publishers.mqtt.port }}
+   {{- end }}
+   {{- if .Values.config.publishers.influxdb.enabled }}
+   ✓ InfluxDB Storage - {{ .Values.config.publishers.influxdb.url }}
+   {{- end }}
+   {{- if .Values.config.publishers.sparkplug.enabled }}
+   ✓ Sparkplug B - Group: {{ .Values.config.publishers.sparkplug.group_id }}, Node: {{ .Values.config.publishers.sparkplug.edge_node_id }}
+   {{- end }}
+   {{- if .Values.config.publishers.sqlite_persistence.enabled }}
+   ✓ SQLite Persistence - /app/data/emberburn.db
+   {{- end }}
+   {{- if .Values.config.publishers.alarms.enabled }}
+   ✓ Alarms & Notifications
+   {{- end }}
+
+4. Quick Status Check:
+
+   # Check deployment status
+   kubectl get all -n {{ include "emberburn.namespace" . }}
+   
+   # View logs
+   kubectl logs -f -n {{ include "emberburn.namespace" . }} -l app=emberburn
+   
+   # Check resource usage
+   kubectl top pod -n {{ include "emberburn.namespace" . }}
+
+5. API Endpoints:
+
+   # Get all tags
+   curl http://<WEB_UI_URL>/api/tags
+   
+   # Get specific tag
+   curl http://<WEB_UI_URL>/api/tags/Temperature
+   
+   # Get publisher statuses
+   curl http://<WEB_UI_URL>/api/publishers
+   
+   # Toggle publisher
+   curl -X POST http://<WEB_UI_URL>/api/publishers/MQTT/toggle
+   
+   # Get active alarms
+   curl http://<WEB_UI_URL>/api/alarms/active
+   
+   {{- if .Values.config.publishers.prometheus.enabled }}
+   # Prometheus metrics
+   curl http://<METRICS_URL>:8000/metrics
+   {{- end }}
+
+6. Web UI Features:
+
+   🔥 Dashboard - Live tag values and system metrics
+   🏷️ Tag Monitor - Complete tag listing with real-time updates
+   📡 Publishers - Enable/disable protocols with one click
+   🚨 Alarms - Active alarm monitoring with priority levels
+   ⚙️ Configuration - System settings and API references
+
+7. Common Operations:
+
+   # Restart EmberBurn
+   kubectl rollout restart deployment/{{ include "emberburn.fullname" . }} -n {{ include "emberburn.namespace" . }}
+   
+   # Scale deployment
+   kubectl scale deployment/{{ include "emberburn.fullname" . }} --replicas=2 -n {{ include "emberburn.namespace" . }}
+   
+   # View configuration
+   kubectl get configmap -n {{ include "emberburn.namespace" . }}
+   
+   # Access database (if persistence enabled)
+   {{- if .Values.persistence.enabled }}
+   kubectl exec -it -n {{ include "emberburn.namespace" . }} deployment/{{ include "emberburn.fullname" . }} -- sqlite3 /app/data/emberburn.db
+   {{- end }}
+
+8. Persistent Storage:
+{{- if .Values.persistence.enabled }}
+   
+   ✓ Persistent storage is ENABLED
+   PVC: {{ include "emberburn.pvcName" . }}
+   Size: {{ .Values.persistence.size }}
+   Mount: {{ .Values.persistence.mountPath }}
+   
+   Your data, logs, and SQLite database will survive pod restarts!
+{{- else }}
+   
+   ⚠ WARNING: Persistent storage is DISABLED!
+   Your data will be LOST when the pod restarts.
+   Enable persistence for production use.
+{{- end }}
+
+9. Resource Allocation:
+   
+   Preset: {{ .Values.emberburn.resources.preset }}
+{{- if eq .Values.emberburn.resources.preset "custom" }}
+   CPU Request: {{ .Values.emberburn.resources.custom.requests.cpu }}
+   CPU Limit: {{ .Values.emberburn.resources.custom.limits.cpu }}
+   Memory Request: {{ .Values.emberburn.resources.custom.requests.memory }}
+   Memory Limit: {{ .Values.emberburn.resources.custom.limits.memory }}
+{{- else }}
+{{- $resources := index .Values.emberburn.resources.presets .Values.emberburn.resources.preset }}
+   CPU Request: {{ $resources.requests.cpu }}
+   CPU Limit: {{ $resources.limits.cpu }}
+   Memory Request: {{ $resources.requests.memory }}
+   Memory Limit: {{ $resources.limits.memory }}
+{{- end }}
+
+10. Troubleshooting:
+
+    # Pod not starting?
+    kubectl describe pod -n {{ include "emberburn.namespace" . }} -l app=emberburn
+    
+    # PVC not binding?
+    kubectl describe pvc -n {{ include "emberburn.namespace" . }} {{ include "emberburn.pvcName" . }}
+    
+    # Check events
+    kubectl get events -n {{ include "emberburn.namespace" . }} --sort-by=.lastTimestamp
+    
+    # Test OPC UA connection
+    kubectl run -it --rm opcua-test --image=python:3.11-slim --restart=Never -- bash
+    > pip install opcua
+    > python -c "from opcua import Client; c=Client('opc.tcp://{{ include "emberburn.fullname" . }}-opcua:4840/freeopcua/server/'); c.connect(); print('Connected!'); c.disconnect()"
+
+11. Documentation:
+   
+    Helm Chart: https://github.com/fireball-industries/helm-charts
+    EmberBurn Docs: https://fireballindustries.com/emberburn
+    Support: https://fireballindustries.com/support
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 Fireball Industries - We Play With Fire So You Don't Have To™
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EmberBurn™ - Where Data Meets Fire 🔥
+
+Happy monitoring! Your industrial data just got 15x more connected. 🚀

@@ -1,11 +1,4 @@
 # Patterns to ignore when building packages.
-# Because Helm doesn't need to package everything
-
-*.swp
-*.bak
-*.tmp
-*.orig
-*~
 .DS_Store
 .git/
 .gitignore
@@ -14,7 +7,12 @@
 .hg/
 .hgignore
 .svn/
-*.tgz
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.project
 .idea/
 *.tmproj
 .vscode/

@@ -1,0 +1,17 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
+  labels:
+    {{- include "emberburn.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "emberburn.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "emberburn.serviceAccountName" . }}
+    namespace: {{ include "emberburn.namespace" . }}
+{{- end }}

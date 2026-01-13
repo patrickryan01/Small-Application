@@ -1,91 +1,37 @@
-{{- /*
-OPC UA Server Deployment
-Because one pod running 15 protocols is peak efficiency
-Patrick Ryan, 2026
-*/ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "opcua-server.fullname" . }}
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
-spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: 1  # OPC UA server state isn't easily replicated, so stick to 1
+    {{- include "emberburn.labels" . | nindent 4 }}
+    {{- with .Values.pod.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.pod.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
   {{- end }}
+spec:
+  replicas: {{ .Values.pod.replicaCount }}
   selector:
     matchLabels:
-      {{- include "opcua-server.selectorLabels" . | nindent 6 }}
+      {{- include "emberburn.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
       labels:
-        {{- include "opcua-server.selectorLabels" . | nindent 8 }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
+        {{- include "emberburn.selectorLabels" . | nindent 8 }}
+        {{- with .Values.pod.labels }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "opcua-server.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-      - name: {{ .Chart.Name }}
-        securityContext:
-          {{- toYaml .Values.securityContext | nindent 12 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        ports:
-        - name: opcua
-          containerPort: 4840
-          protocol: TCP
-        - name: http
-          containerPort: 5000
-          protocol: TCP
-        - name: metrics
-          containerPort: 8000
-          protocol: TCP
-        env:
-        {{- range .Values.env }}
-        - name: {{ .name }}
-          value: {{ .value | quote }}
         {{- end }}
-        {{- with .Values.envFrom }}
-        envFrom:
-          {{- toYaml . | nindent 12 }}
+      annotations:
+        checksum/tags: {{ include (print $.Template.BasePath "/configmap-tags.yaml") . | sha256sum }}
+        checksum/publishers: {{ include (print $.Template.BasePath "/configmap-publishers.yaml") . | sha256sum }}
+        {{- with .Values.pod.annotations }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
-        livenessProbe:
-          {{- toYaml .Values.livenessProbe | nindent 12 }}
-        readinessProbe:
-          {{- toYaml .Values.readinessProbe | nindent 12 }}
-        resources:
-          {{- toYaml .Values.resources | nindent 12 }}
-        volumeMounts:
-        - name: config
-          mountPath: /app/config
-          readOnly: true
-        {{- if .Values.persistence.enabled }}
-        - name: data
-          mountPath: /app/data
-        - name: logs
-          mountPath: /app/logs
-        {{- end }}
-      volumes:
-      - name: config
-        configMap:
-          name: {{ include "opcua-server.fullname" . }}-config
-      {{- if .Values.persistence.enabled }}
-      - name: data
-        persistentVolumeClaim:
-          claimName: {{ include "opcua-server.fullname" . }}-data
-      - name: logs
-        persistentVolumeClaim:
-          claimName: {{ include "opcua-server.fullname" . }}-logs
-      {{- end }}
+    spec:
+      serviceAccountName: {{ include "emberburn.serviceAccountName" . }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -98,3 +44,87 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      securityContext:
+        fsGroup: {{ .Values.emberburn.securityContext.fsGroup }}
+      containers:
+      - name: emberburn
+        image: "{{ .Values.emberburn.image.repository }}:{{ .Values.emberburn.image.tag }}"
+        imagePullPolicy: {{ .Values.emberburn.image.pullPolicy }}
+        ports:
+        - name: opcua
+          containerPort: {{ .Values.emberburn.ports.opcua }}
+          protocol: TCP
+        - name: webui
+          containerPort: {{ .Values.emberburn.ports.webui }}
+          protocol: TCP
+        - name: prometheus
+          containerPort: {{ .Values.emberburn.ports.prometheus }}
+          protocol: TCP
+        env:
+        - name: PYTHONUNBUFFERED
+          value: {{ .Values.emberburn.env.pythonUnbuffered | quote }}
+        - name: UPDATE_INTERVAL
+          value: {{ .Values.emberburn.opcua.updateInterval | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.emberburn.opcua.logLevel | quote }}
+        - name: OPC_ENDPOINT
+          value: {{ .Values.emberburn.opcua.endpoint | quote }}
+        - name: OPC_SERVER_NAME
+          value: {{ .Values.emberburn.opcua.serverName | quote }}
+        - name: OPC_NAMESPACE
+          value: {{ .Values.emberburn.opcua.namespace | quote }}
+        - name: OPC_DEVICE_NAME
+          value: {{ .Values.emberburn.opcua.deviceName | quote }}
+        volumeMounts:
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          mountPath: {{ .Values.persistence.mountPath }}
+        {{- end }}
+        - name: tags-config
+          mountPath: /app/config/tags.json
+          subPath: tags.json
+        - name: publishers-config
+          mountPath: /app/config/publishers.json
+          subPath: publishers.json
+        resources:
+          {{- include "emberburn.resources" . | nindent 10 }}
+        {{- if .Values.emberburn.livenessProbe.enabled }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.emberburn.livenessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.emberburn.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.emberburn.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.emberburn.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.emberburn.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.emberburn.readinessProbe.enabled }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.emberburn.readinessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.emberburn.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.emberburn.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.emberburn.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.emberburn.readinessProbe.failureThreshold }}
+        {{- end }}
+        securityContext:
+          runAsUser: {{ .Values.emberburn.securityContext.runAsUser }}
+          runAsGroup: {{ .Values.emberburn.securityContext.runAsGroup }}
+          runAsNonRoot: {{ .Values.emberburn.securityContext.runAsNonRoot }}
+          allowPrivilegeEscalation: {{ .Values.emberburn.securityContext.allowPrivilegeEscalation }}
+          readOnlyRootFilesystem: {{ .Values.emberburn.securityContext.readOnlyRootFilesystem }}
+          capabilities:
+            drop:
+              {{- toYaml .Values.emberburn.securityContext.capabilities.drop | nindent 14 }}
+      volumes:
+      {{- if .Values.persistence.enabled }}
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "emberburn.pvcName" . }}
+      {{- end }}
+      - name: tags-config
+        configMap:
+          name: {{ include "emberburn.tagsConfigMapName" . }}
+      - name: publishers-config
+        configMap:
+          name: {{ include "emberburn.publishersConfigMapName" . }}
+      restartPolicy: Always

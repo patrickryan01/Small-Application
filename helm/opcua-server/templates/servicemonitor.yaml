@@ -1,20 +1,24 @@
-{{- if .Values.serviceMonitor.enabled }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled -}}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "opcua-server.fullname" . }}
+  name: {{ include "emberburn.fullname" . }}
+  namespace: {{ include "emberburn.namespace" . }}
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
-    {{- with .Values.serviceMonitor.labels }}
+    {{- include "emberburn.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "opcua-server.selectorLabels" . | nindent 6 }}
+      {{- include "emberburn.selectorLabels" . | nindent 6 }}
+      service-type: prometheus
   endpoints:
-  - port: metrics
-    interval: {{ .Values.serviceMonitor.interval }}
-    scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+  - port: prometheus
+    interval: {{ .Values.monitoring.serviceMonitor.interval }}
+    {{- if .Values.monitoring.serviceMonitor.scrapeTimeout }}
+    scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+    {{- end }}
     path: /metrics
 {{- end }}
