@@ -110,9 +110,34 @@ data/*.db
 data/*.log
 ```
 
-## Step 3: Add GitHub Actions Workflow
+## Step 3: GitHub Actions Workflow (Already Configured! ✅)
 
-Create `.github/workflows/docker-publish.yml`:
+The repository already includes a **multi-architecture GitHub Actions workflow** that automatically builds for AMD64 and ARM64!
+
+**File**: `.github/workflows/docker-publish.yml`
+
+**Features**:
+- ✅ Multi-architecture builds (AMD64 + ARM64)
+- ✅ QEMU emulation for cross-platform builds
+- ✅ Build caching for faster builds
+- ✅ SBOM (Software Bill of Materials) generation
+- ✅ Build attestation and provenance
+- ✅ Automatic tagging (latest, semver, branch, SHA)
+- ✅ Pull request validation
+
+**Platforms Supported**:
+- `linux/amd64` - Traditional x86-64 servers, Intel/AMD processors
+- `linux/arm64` - ARM64/aarch64 (Raspberry Pi 4+, AWS Graviton, Apple Silicon, NVIDIA Jetson)
+
+**Automatic Triggers**:
+- Push to `main` or `master` branch → Build and push `latest`
+- Create tag `v*` → Build and push versioned release
+- Pull request → Build only (validation, no push)
+- Manual workflow dispatch → On-demand builds
+
+The workflow is **production-ready** and requires no additional configuration!
+
+## Step 4: Manual Build Options
 
 ```yaml
 name: Build and Push EmberBurn Docker Image

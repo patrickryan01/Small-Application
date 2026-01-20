@@ -47,6 +47,21 @@ This directory contains complete documentation for deploying, managing, and supp
 - Multi-tenant benefits
 - Quick deployment steps
 
+### Multi-Architecture Support
+**[../../docs/ARM64_DEPLOYMENT.md](../../docs/ARM64_DEPLOYMENT.md)**
+- ARM64/aarch64 deployment guide
+- Raspberry Pi deployment
+- AWS Graviton deployment
+- Apple Silicon support
+- Performance comparisons
+- Troubleshooting ARM64 issues
+
+**[../../docs/MULTI_ARCH_QUICK_REFERENCE.md](../../docs/MULTI_ARCH_QUICK_REFERENCE.md)**
+- Quick commands for multi-arch builds
+- Platform-specific deployment
+- Kubernetes node selectors
+- Common use cases
+
 ---
 
 ## 🔧 For DevOps Team (Fireball Industries)

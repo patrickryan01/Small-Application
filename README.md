@@ -47,6 +47,7 @@ Great for development, testing, demos, or just pretending you have a fully instr
 - **🆕 Data Transformation**: Unit conversions, scaling, and computed tags - Transform data on the fly!
 - **🆕 Multi-Protocol**: Run 15 protocols simultaneously - Because we have issues
 - **🔥 EmberBurn Web UI**: Beautiful **Python Flask** web application for configuration and monitoring - Professional, scalable, no build step!
+- **🏗️ Multi-Architecture Support**: Native ARM64 and AMD64 Docker images - Run on Raspberry Pi, AWS Graviton, Apple Silicon, and traditional x86 servers!
 
 ## Quick Start
 

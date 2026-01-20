@@ -66,13 +66,41 @@ Now browse to `http://localhost:5000` for the Web UI!
 
 ### Build & Push Container Image
 
+#### Multi-Architecture Build (Recommended)
+
+EmberBurn now supports **native ARM64 and AMD64 architectures** via automated GitHub Actions builds.
+
+**Automated via GitHub Actions** (recommended):
 ```bash
-# Build for multi-architecture (ARM64 + AMD64)
+# Builds are triggered automatically on push to main/master
+# GitHub Actions builds for linux/amd64 and linux/arm64
+# Images are available at: ghcr.io/fireball-industries/emberburn:latest
+```
+
+**Manual Build Options**:
+
+```bash
+# Option 1: Use the included build script (Linux/Mac)
+bash scripts/build-multi-arch.sh --push --tag 1.0.0
+
+# Option 2: Use PowerShell script (Windows)
+.\scripts\build-multi-arch.ps1 -Push -Tag 1.0.0
+
+# Option 3: Docker buildx directly
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t your-registry.com/opcua-server:1.0.0 \
   --push .
+```
 
-# Or just AMD64 if you're boring
+**Platform-Specific Builds**:
+
+```bash
+# Build for ARM64 only (Raspberry Pi, AWS Graviton, Apple Silicon)
+docker buildx build --platform linux/arm64 \
+  -t your-registry.com/opcua-server:1.0.0-arm64 \
+  --push .
+
+# Build for AMD64 only (traditional x86 servers)
 docker build -t your-registry.com/opcua-server:1.0.0 .
 docker push your-registry.com/opcua-server:1.0.0
 ```
