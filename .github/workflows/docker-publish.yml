@@ -51,10 +51,11 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,prefix={{branch}}-,format=short
+            type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
           flavor: |
             latest=auto
+            suffix=-{{PLATFORM}},onlatest=false
           labels: |
             org.opencontainers.image.title=EmberBurn Industrial IoT Gateway
             org.opencontainers.image.description=Multi-Architecture (AMD64/ARM64) OPC UA Server with 15 protocol support
@@ -67,12 +68,16 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
           sbom: false
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
       
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request' && github.repository_owner == 'fireball-industries'
