@@ -28,8 +28,8 @@ keywords:
 
 home: https://fireballz.ai/emberburn
 sources:
-  - https://github.com/fireball-industries/helm-charts
-  - https://github.com/fireball-industries/Small-Application
+  - https://github.com/Embernet-ai/helm-charts
+  - https://github.com/Embernet-ai/Small-Application
 
 maintainers:
   - name: Patrick Ryan

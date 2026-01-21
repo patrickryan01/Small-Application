@@ -29,7 +29,7 @@ pod:
 # EmberBurn container configuration
 emberburn:
   image:
-    repository: ghcr.io/fireball-industries/emberburn
+    repository: ghcr.io/embernet-ai/emberburn
     tag: "latest"
     pullPolicy: Always  # Use Always for development, IfNotPresent for production
   

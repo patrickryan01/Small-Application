@@ -9,7 +9,7 @@
 # Options:
 #   -Push              Push images to registry after build
 #   -Tag TAG           Specify custom tag (default: latest)
-#   -Registry REG      Specify registry (default: ghcr.io/fireball-industries)
+#   -Registry REG      Specify registry (default: ghcr.io/embernet-ai)
 #   -Platforms PLAT    Specify platforms (default: linux/amd64,linux/arm64)
 #   -Load              Load image to local Docker (single platform only)
 #   -DryRun            Show commands without executing
@@ -18,7 +18,7 @@
 param(
     [switch]$Push = $false,
     [string]$Tag = "latest",
-    [string]$Registry = "ghcr.io/fireball-industries",
+    [string]$Registry = "ghcr.io/embernet-ai",
     [string]$ImageName = "emberburn",
     [string]$Platforms = "linux/amd64,linux/arm64",
     [switch]$Load = $false,
@@ -103,7 +103,7 @@ $BuildArgs = @(
     "--cache-from", "type=registry,ref=${Registry}/${ImageName}:buildcache",
     "--cache-to", "type=registry,ref=${Registry}/${ImageName}:buildcache,mode=max",
     "--build-arg", "BUILDKIT_INLINE_CACHE=1",
-    "--label", "org.opencontainers.image.source=https://github.com/fireball-industries/Small-Application",
+    "--label", "org.opencontainers.image.source=https://github.com/Embernet-ai/Small-Application",
     "--label", "org.opencontainers.image.description=EmberBurn Industrial IoT Gateway",
     "--label", "org.opencontainers.image.version=$Tag",
     "--label", "org.opencontainers.image.created=$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)"

@@ -9,7 +9,7 @@
 # Options:
 #   --push              Push images to registry after build
 #   --tag TAG           Specify custom tag (default: latest)
-#   --registry REG      Specify registry (default: ghcr.io/fireball-industries)
+#   --registry REG      Specify registry (default: ghcr.io/embernet-ai)
 #   --platforms PLAT    Specify platforms (default: linux/amd64,linux/arm64)
 #   --load              Load image to local Docker (single platform only)
 #   --cache-from TYPE   Cache source (default: type=gha)
@@ -27,7 +27,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-REGISTRY="${REGISTRY:-ghcr.io/fireball-industries}"
+REGISTRY="${REGISTRY:-ghcr.io/embernet-ai}"
 IMAGE_NAME="${IMAGE_NAME:-emberburn}"
 TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
@@ -146,7 +146,7 @@ BUILD_CMD="$BUILD_CMD --cache-to $CACHE_TO"
 BUILD_CMD="$BUILD_CMD --build-arg BUILDKIT_INLINE_CACHE=1"
 
 # Add metadata labels
-BUILD_CMD="$BUILD_CMD --label org.opencontainers.image.source=https://github.com/fireball-industries/Small-Application"
+BUILD_CMD="$BUILD_CMD --label org.opencontainers.image.source=https://github.com/Embernet-ai/Small-Application"
 BUILD_CMD="$BUILD_CMD --label org.opencontainers.image.description='EmberBurn Industrial IoT Gateway'"
 BUILD_CMD="$BUILD_CMD --label org.opencontainers.image.version=$TAG"
 BUILD_CMD="$BUILD_CMD --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
