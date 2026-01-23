@@ -62,6 +62,21 @@ cd Small-Application
 pip install -r requirements.txt
 ```
 
+### Helm Installation
+
+Install directly from our Helm repository:
+
+```bash
+# Add the Helm repository
+helm repo add emberburn https://embernet-ai.github.io/Small-Application
+
+# Update repositories
+helm repo update
+
+# Install the chart
+helm install emberburn emberburn/emberburn
+```
+
 **Dependencies:**
 - `opcua` - OPC UA server implementation
 - `paho-mqtt` - MQTT client for publishing

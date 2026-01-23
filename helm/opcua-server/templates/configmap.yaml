@@ -5,12 +5,12 @@ Because environment variables for JSON is masochism
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "opcua-server.fullname" . }}-config
+  name: {{ include "emberburn.fullname" . }}-config
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
+    {{- include "emberburn.labels" . | nindent 4 }}
 data:
   config.json: |
     {
-      "tags": {{ .Values.config.tags | fromYaml | toJson }},
-      "publishers": {{ .Values.config.publishers | fromYaml | toJson }}
+      "tags": {{ .Values.config.tags | toJson }},
+      "publishers": {{ .Values.config.publishers | toJson }}
     }

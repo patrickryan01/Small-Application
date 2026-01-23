@@ -5,9 +5,9 @@ Exposing 3 ports because we're extra like that
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "opcua-server.fullname" . }}
+  name: {{ include "emberburn.fullname" . }}
   labels:
-    {{- include "opcua-server.labels" . | nindent 4 }}
+    {{- include "emberburn.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -19,13 +19,13 @@ spec:
     targetPort: opcua
     protocol: {{ .Values.service.opcua.protocol }}
     name: opcua
-  - port: {{ .Values.service.rest.port }}
+  - port: {{ .Values.service.webui.port }}
     targetPort: http
-    protocol: {{ .Values.service.rest.protocol }}
+    protocol: {{ .Values.service.webui.protocol }}
     name: http
   - port: {{ .Values.service.prometheus.port }}
     targetPort: metrics
     protocol: {{ .Values.service.prometheus.protocol }}
     name: metrics
   selector:
-    {{- include "opcua-server.selectorLabels" . | nindent 4 }}
+    {{- include "emberburn.selectorLabels" . | nindent 4 }}
