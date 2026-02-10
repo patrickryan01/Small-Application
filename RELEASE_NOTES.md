@@ -1,5 +1,16 @@
 # EmberBurn Release Notes
 
+## v3.5.4 — 2026-02-10
+
+### Hotfix
+
+- **Fixed**: `embernet.io/app-icon` label used emoji `🔥` which is not a valid Kubernetes label value (must be alphanumeric, `-`, `_`, `.`). Changed to `"fire"`.
+- **Fixed**: Added `release: types: [published]` trigger to `docker-publish.yml` so GitHub Releases created through the UI fire the container build workflow.
+- Chart version: `3.5.4`, appVersion: `3.5.4`
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.5.4`
+
+---
+
 ## v3.5.3 — 2026-02-10
 
 ### 🔥 Highlights
@@ -45,13 +56,12 @@ New REST endpoints in `publishers.py`:
 
 ### Helm Chart
 
-- Added `embernet.io/app-icon: "🔥"` label to pod template
+- Added `embernet.io/app-icon` label to pod template
 - Chart icon set to Embernet GitHub org avatar
 - Added `emberburn-chart-icon.png` asset
 - Fixed `index.yaml` URL to `https://embernet-ai.github.io/Emberburn/`
 - Fixed `sources` in `Chart.yaml` to point to `Embernet-ai/Emberburn`
-- Image tag pinned to `3.5.3`, pullPolicy set to `IfNotPresent`
-- Chart version: `3.5.3`, appVersion: `3.5.3`
+- Image tag pinned, pullPolicy set to `IfNotPresent`
 
 ### Container Image
 
@@ -69,11 +79,12 @@ New REST endpoints in `publishers.py`:
 
 ---
 
-### Bug Fixes (v3.5.1 → v3.5.3)
+### Bug Fixes (v3.5.1 → v3.5.4)
 
 - **v3.5.1**: Added actual Embernet artwork assets (replaced empty placeholders)
 - **v3.5.2**: Fixed GZIP invalid header caused by `index.yaml` pointing to wrong GitHub Pages domain
 - **v3.5.3**: Fixed `index.yaml` URL to correct org repo (`Embernet-ai/Emberburn`), fixed `sources` in `Chart.yaml`
+- **v3.5.4**: Fixed invalid K8s label (emoji not allowed), added `release` event trigger to GitHub Actions workflow
 
 ---
 
