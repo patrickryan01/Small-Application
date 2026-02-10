@@ -1,5 +1,16 @@
 # EmberBurn Release Notes
 
+## v3.5.5 — 2026-02-10
+
+### Hotfix: CrashLoopBackOff
+
+- **Root cause**: Liveness/readiness probes targeted OPC UA port `4840`, which is slow to bind during container startup (tag loading, protocol initialization). K8s killed the container before OPC UA finished starting.
+- **Fix**: Probes now target Flask web UI port `5000` (starts instantly, reliable liveness indicator).
+- Liveness: `initialDelaySeconds: 45`, `failureThreshold: 6` (more startup headroom).
+- **All container ports unchanged**: `4840` (OPC UA), `5000` (WebUI), `8000` (Prometheus) — industrial protocol data still flows on all ports.
+
+---
+
 ## v3.5.4 — 2026-02-10
 
 ### Hotfix
