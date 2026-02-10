@@ -8,7 +8,7 @@ entries:
       catalog.cattle.io/featured: "true"
       catalog.cattle.io/provides-gvr: apps/v1/Deployment
       catalog.cattle.io/release-name: emberburn
-      catalog.cattle.io/upstream-version: 1.0.3
+      catalog.cattle.io/upstream-version: 3.5.0
       fireball.industries/branding: emberburn
       fireball.industries/project-type: industrial-iot-gateway
       fireball.industries/protocols: "15"
@@ -64,13 +64,15 @@ entries:
     apiVersion: v2
     appVersion: 1.0.3
     created: "2026-01-26T15:47:29.1495511-03:00"
+    appVersion: 3.5.0
+    created: "2026-02-10T15:54:17.6286927-05:00"
     description: 'OPC UA Industrial IoT Gateway with 15 protocol support and fire-themed
       web UI. Because your industrial data deserves to be as hot as your infrastructure.  EmberBurn
       is a multi-protocol industrial IoT gateway featuring OPC UA server, MQTT, REST
       API, GraphQL, Sparkplug B, Kafka, AMQP, WebSocket, Modbus TCP, Prometheus metrics,
       InfluxDB integration, alarms, data transformation, SQLite persistence, and a
       beautiful Python Flask web UI for configuration and monitoring. '
-    digest: 148329a55f5663298361802ec95a44ae15ae703d4666f136703ecb1b710fc68a
+    digest: ba241813a853e9ba7f8105c3e41ad14c9446e003aefb067956e953ed4fc27278
     home: https://fireballz.ai/emberburn
     icon: https://fireballindustries.com/assets/emberburn-icon.svg
     keywords:
@@ -153,3 +155,6 @@ entries:
     - emberburn-1.0.5.tgz
     version: 1.0.5
 generated: "2026-01-26T15:47:29.1317207-03:00"
+    - https://fireball-industries.github.io/helm-charts/emberburn-3.5.0.tgz
+    version: 3.5.0
+generated: "2026-02-10T15:54:17.625087-05:00"

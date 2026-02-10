@@ -1,26 +1,19 @@
 # Default values for EmberBurn - Multi-Protocol Industrial IoT Gateway
 # "Where Data Meets Fire" - Fireball Industries
-
-# Namespace configuration
-namespace:
-  name: emberburn
-  create: true
-  labels:
-    app: emberburn
-    managed-by: fireball-industries
-    podstore-type: industrial-iot
+# NOTE: Do NOT create Namespace resources in Helm charts.
+# Use: helm install <release> ./chart -n <namespace> --create-namespace
 
 # Pod configuration
 pod:
   replicaCount: 1
-  
+
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8000"
     prometheus.io/path: "/metrics"
-  
+
   labels: {}
-  
+
   serviceAccount:
     create: true
     annotations: {}
@@ -30,9 +23,9 @@ pod:
 emberburn:
   image:
     repository: ghcr.io/embernet-ai/emberburn
-    tag: "latest"
-    pullPolicy: Always  # Use Always for development, IfNotPresent for production
-  
+    tag: "3.5.0"
+    pullPolicy: IfNotPresent # Use Always for development, IfNotPresent for production
+
   # OPC UA Server configuration
   opcua:
     updateInterval: 2.0
@@ -41,25 +34,25 @@ emberburn:
     serverName: "EmberBurn Industrial IoT Gateway"
     namespace: "http://fireballindustries.com/emberburn"
     deviceName: "EmberBurn"
-  
+
   # Protocol ports
   ports:
-    opcua: 4840       # OPC UA Server
-    webui: 5000       # REST API + Web UI
-    prometheus: 8000  # Prometheus metrics
-    modbus: 5020      # Modbus TCP (if enabled)
-    websocket: 9001   # WebSocket (if enabled)
-  
+    opcua: 4840 # OPC UA Server
+    webui: 5000 # REST API + Web UI
+    prometheus: 8000 # Prometheus metrics
+    modbus: 5020 # Modbus TCP (if enabled)
+    websocket: 9001 # WebSocket (if enabled)
+
   # Environment variables
   env:
     pythonUnbuffered: "1"
     updateInterval: "2.0"
     logLevel: "INFO"
-  
+
   # Resource presets (small, medium, large, custom)
   resources:
     preset: "medium"
-    
+
     # Custom resources (used when preset: custom)
     custom:
       requests:
@@ -68,7 +61,7 @@ emberburn:
       limits:
         cpu: "1000m"
         memory: "2Gi"
-    
+
     # Preset definitions
     presets:
       small:
@@ -78,7 +71,7 @@ emberburn:
         limits:
           cpu: "500m"
           memory: "1Gi"
-      
+
       medium:
         requests:
           cpu: "250m"
@@ -86,7 +79,7 @@ emberburn:
         limits:
           cpu: "1000m"
           memory: "2Gi"
-      
+
       large:
         requests:
           cpu: "500m"
@@ -94,7 +87,7 @@ emberburn:
         limits:
           cpu: "2000m"
           memory: "4Gi"
-  
+
   # Health checks
   livenessProbe:
     enabled: true
@@ -104,7 +97,7 @@ emberburn:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
+
   readinessProbe:
     enabled: true
     tcpSocket:
@@ -113,7 +106,7 @@ emberburn:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-  
+
   # Security context
   securityContext:
     runAsUser: 1000
@@ -121,7 +114,7 @@ emberburn:
     fsGroup: 1000
     runAsNonRoot: true
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false  # EmberBurn writes logs and data
+    readOnlyRootFilesystem: false # EmberBurn writes logs and data
     capabilities:
       drop:
         - ALL
@@ -130,10 +123,10 @@ emberburn:
 config:
   # Use existing config from existing chart or define new
   useExisting: false
-  
+
   # Config file to use (must exist in container)
   configFile: "config_transformations_demo.json"
-  
+
   # Custom tags configuration (JSON)
   tags:
     Temperature:
@@ -145,7 +138,7 @@ config:
       max: 30.0
       units: "°C"
       description: "Ambient temperature"
-    
+
     Pressure:
       type: "float"
       initial_value: 101.3
@@ -155,7 +148,7 @@ config:
       max: 105.0
       units: "kPa"
       description: "System pressure"
-    
+
     RunHours:
       type: "int"
       initial_value: 0
@@ -165,13 +158,13 @@ config:
       max: 10000
       reset_on_max: true
       description: "Equipment run hours"
-    
+
     SystemStatus:
       type: "string"
       initial_value: "Running"
       simulate: false
       description: "System operational status"
-  
+
   # Publishers configuration
   publishers:
     # REST API & Web UI (always enabled)
@@ -179,7 +172,7 @@ config:
       enabled: true
       host: "0.0.0.0"
       port: 5000
-    
+
     # MQTT Publisher
     mqtt:
       enabled: false
@@ -192,7 +185,7 @@ config:
       topic_prefix: "industrial/emberburn"
       qos: 1
       retain: false
-    
+
     # InfluxDB Storage
     influxdb:
       enabled: false
@@ -201,13 +194,13 @@ config:
       org: "fireball-industries"
       bucket: "emberburn"
       measurement: "tags"
-    
+
     # Prometheus Metrics
     prometheus:
       enabled: true
       port: 8000
       path: "/metrics"
-    
+
     # Sparkplug B (Ignition Edge)
     sparkplug:
       enabled: false
@@ -215,19 +208,19 @@ config:
       port: 1883
       group_id: "Fireball"
       edge_node_id: "EmberBurn"
-    
+
     # GraphQL API
     graphql:
       enabled: false
       port: 5000
       path: "/graphql"
-    
+
     # Data Transformation
     data_transformation:
       enabled: true
       transformations: []
       computed_tags: []
-    
+
     # Alarms
     alarms:
       enabled: true
@@ -244,7 +237,7 @@ config:
         slack:
           enabled: false
           webhook_url: ""
-    
+
     # SQLite Persistence
     sqlite_persistence:
       enabled: true
@@ -254,19 +247,19 @@ config:
 # Persistent storage configuration
 persistence:
   enabled: true
-  
+
   # Storage class (leave empty for default)
   storageClass: ""
-  
+
   # Storage size
   size: "10Gi"
-  
+
   # Access mode
   accessMode: ReadWriteOnce
-  
+
   # Mount path in container
   mountPath: /app/data
-  
+
   # Annotations
   annotations: {}
 
@@ -279,17 +272,17 @@ service:
     targetPort: 4840
     protocol: TCP
     annotations: {}
-  
+
   # Web UI / REST API Service
   webui:
-    type: LoadBalancer
+    type: ClusterIP
     port: 5000
     targetPort: 5000
     protocol: TCP
     # NodePort (only used if type: NodePort)
     nodePort: null
     annotations: {}
-  
+
   # Prometheus Metrics Service
   prometheus:
     type: ClusterIP
@@ -297,13 +290,13 @@ service:
     targetPort: 8000
     protocol: TCP
     annotations: {}
-  
+
   labels: {}
 
 # Ingress configuration (for Web UI)
 ingress:
   enabled: false
-  className: "nginx"
+  className: "traefik"
   annotations:
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
     # nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -338,7 +331,7 @@ networkPolicy:
   policyTypes:
     - Ingress
     - Egress
-  
+
   ingress:
     - from:
         - namespaceSelector:
@@ -352,9 +345,9 @@ networkPolicy:
       ports:
         - protocol: TCP
           port: 4840
-  
+
   egress:
-    - {}  # Allow all egress by default
+    - {} # Allow all egress by default
 
 # Horizontal Pod Autoscaler
 autoscaling:
@@ -380,7 +373,7 @@ external:
     deploy: false
     service: "mosquitto.default.svc.cluster.local"
     port: 1883
-  
+
   # InfluxDB (if not using external)
   influxdb:
     deploy: false

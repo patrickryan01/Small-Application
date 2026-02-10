@@ -54,6 +54,12 @@ def config():
     return render_template('config.html')
 
 
+@web_ui.route('/tag-generator')
+def tag_generator():
+    """OPC UA Tag Generator / Creator."""
+    return render_template('tag_generator.html')
+
+
 # Health check for the UI blueprint
 @web_ui.route('/health')
 def health():

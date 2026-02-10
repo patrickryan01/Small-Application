@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ include "emberburn.fullname" . }}
-  namespace: {{ include "emberburn.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
 spec:

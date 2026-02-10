@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "emberburn.fullname" . }}
-  namespace: {{ include "emberburn.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
     {{- with .Values.pod.labels }}
@@ -21,6 +21,9 @@ spec:
     metadata:
       labels:
         {{- include "emberburn.selectorLabels" . | nindent 8 }}
+        embernet.io/store-app: "true"
+        embernet.io/app-name: {{ .Chart.Name | quote }}
+        embernet.io/app-icon: "🔥"
         {{- with .Values.pod.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

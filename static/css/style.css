@@ -1,4 +1,7 @@
-/* EmberBurn Web UI Styles - Fire Theme */
+/* EmberBurn Web UI Styles — Embernet Industrial Design System */
+/* Migrated from fire/orange theme to Embernet red palette */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 * {
     margin: 0;
@@ -7,147 +10,174 @@
 }
 
 :root {
-    --flame-orange: #ff6b35;
-    --flame-red: #ff4136;
-    --ember-dark: #1a1a1a;
-    --ember-gray: #2d2d2d;
-    --smoke-gray: #4a4a4a;
-    --ash-light: #e0e0e0;
-    --fire-yellow: #ffd700;
+    /* Primary */
+    --ember-red: #E31837;
+    --ember-red-hover: #c21530;
+
+    /* Dark Mode (Default) */
+    --portal-bg: #121212;
+    --card-bg: #1E1E1E;
+    --text-main: #E0E0E0;
+    --text-sub: #aaaaaa;
+    --border-color: #333333;
+    --shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+
+    /* Keep for value highlights */
+    --fire-yellow: #ffb347;
+
+    /* Light Mode */
+    --portal-bg-light: #f4f6f8;
+    --card-bg-light: #ffffff;
+    --text-main-light: #333333;
+    --text-sub-light: #666666;
+    --border-color-light: #e0e0e0;
+
+    /* Status Colors */
     --success-green: #28a745;
-    --warning-orange: #ff9500;
+    --warning-yellow: #ff9800;
     --error-red: #dc3545;
+    --info: #17a2b8;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-    color: #e0e0e0;
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    background: var(--portal-bg);
+    color: var(--text-main);
     min-height: 100vh;
+}
+
+/* Dark mode is the default, light mode is the override */
+body.light-mode {
+    --portal-bg: var(--portal-bg-light);
+    --card-bg: var(--card-bg-light);
+    --text-main: var(--text-main-light);
+    --text-sub: var(--text-sub-light);
+    --border-color: var(--border-color-light);
+    --shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background: var(--portal-bg-light);
+    color: var(--text-main-light);
 }
 
 .app-container {
     display: flex;
-    height: 100vh;
-}
-
-/* Sidebar */
-.sidebar {
-    width: 280px;
-    background: var(--ember-gray);
-    border-right: 2px solid var(--flame-orange);
-    padding: 20px;
-    overflow-y: auto;
-    display: flex;
     flex-direction: column;
+    min-height: 100vh;
 }
 
-.logo-section {
-    text-align: center;
-    margin-bottom: 30px;
-    padding: 20px;
-    background: var(--ember-dark);
-    border-radius: 10px;
-    border: 1px solid var(--flame-orange);
+/* ── Header (replaces sidebar) ── */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 30px;
+    border-bottom: 2px solid var(--border-color);
+    background: var(--card-bg);
 }
 
-.ascii-art {
-    font-family: 'Courier New', monospace;
-    font-size: 10px;
-    line-height: 1;
-    margin-bottom: 10px;
-    white-space: pre;
-}
-
-.ember-logo {
-    color: var(--fire-yellow);
-    font-size: 12px;
-}
-
-.fireball-logo {
-    color: var(--flame-orange);
-}
-
-.tagline {
-    color: var(--ash-light);
-    font-size: 11px;
-    margin-top: 10px;
-    font-style: italic;
-}
-
-.nav-menu {
-    list-style: none;
-}
-
-.nav-menu li {
-    margin: 8px 0;
-}
-
-.nav-item {
+.header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.3s;
+    gap: 15px;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+}
+
+.logo-image {
+    height: 40px;
+    width: auto;
+    max-width: 180px;
+    object-fit: contain;
+}
+
+.app-title {
+    font-size: 1.4em;
+    font-weight: 700;
+    color: var(--ember-red);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.nav-bar {
+    display: flex;
+    gap: 4px;
+}
+
+.nav-link {
+    color: var(--text-sub);
     text-decoration: none;
-    color: var(--ash-light);
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-size: 0.9em;
 }
 
-.nav-item:hover {
-    background: var(--smoke-gray);
-    transform: translateX(5px);
+.nav-link:hover,
+.nav-link.active {
+    color: white;
+    background: var(--ember-red);
 }
 
-.nav-item.active {
-    background: var(--flame-orange);
-    color: var(--ember-dark);
-    font-weight: bold;
+.theme-toggle {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.2em;
+    color: var(--text-main);
+    transition: border-color 0.2s;
 }
 
-.nav-icon {
-    font-size: 20px;
+.theme-toggle:hover {
+    border-color: var(--ember-red);
 }
 
-.sidebar-footer {
-    margin-top: auto;
-    padding-top: 30px;
-    font-size: 12px;
-    color: #666;
-    text-align: center;
+.company-logo-container {
+    display: flex;
+    align-items: center;
 }
 
-.footer-item {
-    margin: 5px 0;
+.company-logo-image {
+    height: 30px;
+    width: auto;
+    object-fit: contain;
 }
 
-.footer-item:last-child {
-    font-style: italic;
-}
-
-/* Main Content */
+/* ── Main Content (full-width, no sidebar margin) ── */
 .main-content {
     flex: 1;
     padding: 30px;
     overflow-y: auto;
 }
 
-.header {
+/* ── Page Section Headers ── */
+.page-header {
     margin-bottom: 30px;
 }
 
-.header h1 {
-    color: var(--flame-orange);
-    font-size: 32px;
-    margin-bottom: 10px;
+.page-header h1 {
+    color: var(--ember-red);
+    font-size: 28px;
+    margin-bottom: 8px;
+    font-weight: 700;
 }
 
-.header p {
-    color: var(--ash-light);
+.page-header p {
+    color: var(--text-sub);
+    font-size: 0.95em;
 }
 
-/* Cards */
+/* ── Cards ── */
 .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -156,17 +186,16 @@ body {
 }
 
 .card {
-    background: var(--ember-gray);
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
     padding: 20px;
-    border: 1px solid var(--smoke-gray);
-    transition: all 0.3s;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s;
 }
 
 .card:hover {
-    border-color: var(--flame-orange);
-    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
-    transform: translateY(-2px);
+    border-color: var(--ember-red);
 }
 
 .card-header {
@@ -174,11 +203,14 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+    font-weight: 600;
+    font-size: 1.1em;
+    color: var(--text-main);
 }
 
 .card-title {
     font-size: 18px;
-    color: var(--ash-light);
+    color: var(--text-main);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -187,16 +219,16 @@ body {
 .card-value {
     font-size: 36px;
     font-weight: bold;
-    color: var(--flame-orange);
+    color: var(--ember-red);
     margin: 10px 0;
 }
 
 .card-subtitle {
-    color: var(--smoke-gray);
+    color: var(--text-sub);
     font-size: 14px;
 }
 
-/* Status Badges */
+/* ── Status Badges ── */
 .status-badge {
     padding: 4px 12px;
     border-radius: 20px;
@@ -212,13 +244,13 @@ body {
 }
 
 .status-inactive {
-    background: var(--smoke-gray);
-    color: var(--ash-light);
+    background: var(--border-color);
+    color: var(--text-main);
 }
 
 .status-warning {
-    background: var(--warning-orange);
-    color: var(--ember-dark);
+    background: var(--warning-yellow);
+    color: #1a1a1a;
 }
 
 .status-critical {
@@ -226,14 +258,14 @@ body {
     color: white;
 }
 
-/* Buttons */
+/* ── Buttons ── */
 .btn {
-    padding: 10px 20px;
+    padding: 8px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 4px;
     cursor: pointer;
-    font-weight: bold;
-    transition: all 0.3s;
+    font-weight: 600;
+    transition: all 0.2s;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -241,22 +273,23 @@ body {
 }
 
 .btn-primary {
-    background: var(--flame-orange);
+    background: var(--ember-red);
     color: white;
 }
 
 .btn-primary:hover {
-    background: var(--flame-red);
-    box-shadow: 0 0 15px rgba(255, 107, 53, 0.5);
+    background: var(--ember-red-hover);
 }
 
 .btn-secondary {
-    background: var(--smoke-gray);
-    color: var(--ash-light);
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-    background: var(--ember-dark);
+    border-color: var(--ember-red);
+    color: var(--ember-red);
 }
 
 .btn-success {
@@ -269,12 +302,12 @@ body {
     color: white;
 }
 
-/* Table */
+/* ── Tables ── */
 .table-container {
-    background: var(--ember-gray);
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
     overflow: hidden;
-    border: 1px solid var(--smoke-gray);
+    border: 1px solid var(--border-color);
 }
 
 table {
@@ -283,33 +316,33 @@ table {
 }
 
 thead {
-    background: var(--ember-dark);
+    background: var(--portal-bg);
 }
 
 th {
     padding: 15px;
     text-align: left;
-    color: var(--flame-orange);
-    font-weight: bold;
-    border-bottom: 2px solid var(--flame-orange);
+    color: var(--ember-red);
+    font-weight: 600;
+    border-bottom: 2px solid var(--ember-red);
 }
 
 td {
     padding: 12px 15px;
-    border-bottom: 1px solid var(--smoke-gray);
+    border-bottom: 1px solid var(--border-color);
 }
 
 tr:hover {
-    background: var(--smoke-gray);
+    background: rgba(227, 24, 55, 0.05);
 }
 
 td.loading {
     text-align: center;
-    color: var(--smoke-gray);
+    color: var(--text-sub);
     font-style: italic;
 }
 
-/* Pulse Animation */
+/* ── Pulse Animation ── */
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -319,10 +352,10 @@ td.loading {
     animation: pulse 2s infinite;
 }
 
-/* Loading Spinner */
+/* ── Loading Spinner ── */
 .spinner {
-    border: 3px solid var(--smoke-gray);
-    border-top: 3px solid var(--flame-orange);
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--ember-red);
     border-radius: 50%;
     width: 40px;
     height: 40px;
@@ -335,30 +368,30 @@ td.loading {
     100% { transform: rotate(360deg); }
 }
 
-/* Scrollbar */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {
     width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--ember-dark);
+    background: var(--portal-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--flame-orange);
+    background: var(--ember-red);
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--flame-red);
+    background: var(--ember-red-hover);
 }
 
-/* Section */
+/* ── Section ── */
 .section {
     margin-top: 30px;
 }
 
-/* Publisher Grid */
+/* ── Publisher Grid ── */
 .publishers-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -366,16 +399,15 @@ td.loading {
 }
 
 .publisher-card {
-    background: var(--ember-gray);
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
     padding: 20px;
-    border: 1px solid var(--smoke-gray);
-    transition: all 0.3s;
+    border: 1px solid var(--border-color);
+    transition: border-color 0.2s;
 }
 
 .publisher-card:hover {
-    border-color: var(--flame-orange);
-    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+    border-color: var(--ember-red);
 }
 
 .publisher-header {
@@ -387,7 +419,7 @@ td.loading {
 
 .publisher-title {
     font-size: 18px;
-    color: var(--ash-light);
+    color: var(--text-main);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -400,7 +432,7 @@ td.loading {
 .publisher-description {
     margin: 15px 0;
     font-size: 14px;
-    color: #999;
+    color: var(--text-sub);
 }
 
 .publisher-actions {
@@ -413,11 +445,11 @@ td.loading {
     flex: 1;
 }
 
-/* Empty State */
+/* ── Empty State ── */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
-    color: var(--smoke-gray);
+    color: var(--text-sub);
 }
 
 .empty-state-icon {
@@ -434,7 +466,7 @@ td.loading {
     font-size: 14px;
 }
 
-/* Form Elements */
+/* ── Form Elements ── */
 .form-group {
     margin-bottom: 20px;
 }
@@ -442,29 +474,30 @@ td.loading {
 .form-label {
     display: block;
     margin-bottom: 8px;
-    color: var(--ash-light);
-    font-weight: bold;
+    color: var(--text-main);
+    font-weight: 600;
 }
 
 .form-input,
 .form-select {
     width: 100%;
     padding: 10px;
-    background: var(--ember-dark);
-    border: 1px solid var(--smoke-gray);
-    border-radius: 6px;
-    color: var(--ash-light);
+    background: var(--portal-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-main);
     font-size: 14px;
+    font-family: 'Inter', sans-serif;
 }
 
 .form-input:focus,
 .form-select:focus {
     outline: none;
-    border-color: var(--flame-orange);
-    box-shadow: 0 0 10px rgba(255, 107, 53, 0.3);
+    border-color: var(--ember-red);
+    box-shadow: 0 0 0 3px rgba(227, 24, 55, 0.2);
 }
 
-/* Info Grid */
+/* ── Info Grid ── */
 .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -477,12 +510,83 @@ td.loading {
 }
 
 .info-item div {
-    color: #999;
+    color: var(--text-sub);
 }
 
-/* Action Bar */
+/* ── Action Bar ── */
 .action-bar {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+/* ── Status Footer ── */
+.status-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 30px;
+    border-top: 1px solid var(--border-color);
+    background: var(--card-bg);
+    font-size: 0.85em;
+    color: var(--text-sub);
+}
+
+.status-footer button {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    color: var(--text-main);
+}
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.dot-green {
+    background: var(--success-green);
+}
+
+.dot-red {
+    background: var(--error-red);
+}
+
+.dot-yellow {
+    background: var(--warning-yellow);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 15px;
+    }
+
+    .header-right {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .nav-bar {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .nav-link {
+        font-size: 0.8em;
+        padding: 4px 8px;
+    }
+
+    .main-content {
+        padding: 15px;
+    }
 }

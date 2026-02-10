@@ -3,67 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}EmberBurn - Industrial IoT Gateway{% endblock %}</title>
+    <title>{% block title %}Emberburn — Industrial IoT Gateway{% endblock %}</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('web_ui.static', filename='images/favicon-32x32.png') }}">
     <link rel="stylesheet" href="{{ url_for('web_ui.static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Dark mode init — must run before first paint -->
+    <script>
+    (function () {
+        var stored = localStorage.getItem('theme');
+        if (stored === 'light') {
+            document.body.classList.add('light-mode');
+        }
+        // Default is dark (no class needed)
+    })();
+    </script>
+
     <div class="app-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="logo-section">
-                <div class="ascii-art ember-logo">
-  _____ __  __ ____  _____ ____  ____  _   _ ____  _   _ 
- | ____|  \/  | __ )| ____|  _ \| __ )| | | |  _ \| \ | |
- |  _| | |\/| |  _ \|  _| | |_) |  _ \| | | | |_) |  \| |
- | |___| |  | | |_) | |___|  _ <| |_) | |_| |  _ <| |\  |
- |_____|_|  |_|____/|_____|_| \_\____/ \___/|_| \_\_| \_|
+        <!-- Header (replaces sidebar) -->
+        <div class="header">
+            <div class="header-left">
+                <div class="logo-container">
+                    <img id="header-logo" src="{{ url_for('web_ui.static', filename='images/embernet-white.png') }}"
+                         alt="Embernet" class="logo-image" />
                 </div>
-                <div class="ascii-art fireball-logo">
-    _____ _           _           _ _ 
-   |  ___(_)_ __ ___| |__   __ _| | |
-   | |_  | | '__/ _ \ '_ \ / _` | | |
-   |  _| | | | |  __/ |_) | (_| | | |
-   |_|   |_|_|  \___|_.__/ \__,_|_|_|
-                                      
-   ___           _           _        _           
-  |_ _|_ __   __| |_   _ ___| |_ _ __(_) ___  ___ 
-   | || '_ \ / _` | | | / __| __| '__| |/ _ \/ __|
-   | || | | | (_| | |_| \__ \ |_| |  | |  __/\__ \
-  |___|_| |_|\__,_|\__,_|___/\__|_|  |_|\___||___/
-                </div>
-                <div class="tagline">Industrial IoT Gateway Platform</div>
+                <span class="app-title">Emberburn</span>
             </div>
-
-            <nav>
-                <ul class="nav-menu">
-                    <li><a href="{{ url_for('web_ui.index') }}" class="nav-item {% if request.endpoint == 'web_ui.index' %}active{% endif %}">
-                        <span class="nav-icon">📊</span>
-                        <span>Dashboard</span>
-                    </a></li>
-                    <li><a href="{{ url_for('web_ui.tags') }}" class="nav-item {% if request.endpoint == 'web_ui.tags' %}active{% endif %}">
-                        <span class="nav-icon">🏷️</span>
-                        <span>Tag Monitor</span>
-                    </a></li>
-                    <li><a href="{{ url_for('web_ui.publishers') }}" class="nav-item {% if request.endpoint == 'web_ui.publishers' %}active{% endif %}">
-                        <span class="nav-icon">📡</span>
-                        <span>Publishers</span>
-                    </a></li>
-                    <li><a href="{{ url_for('web_ui.alarms') }}" class="nav-item {% if request.endpoint == 'web_ui.alarms' %}active{% endif %}">
-                        <span class="nav-icon">🚨</span>
-                        <span>Alarms</span>
-                    </a></li>
-                    <li><a href="{{ url_for('web_ui.config') }}" class="nav-item {% if request.endpoint == 'web_ui.config' %}active{% endif %}">
-                        <span class="nav-icon">⚙️</span>
-                        <span>Configuration</span>
-                    </a></li>
-                </ul>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="footer-item">12 Protocols Active</div>
-                <div class="footer-item">© 2026 Fireball Industries</div>
-                <div class="footer-item">By Patrick Ryan, CTO</div>
+            <div class="header-right">
+                <nav class="nav-bar">
+                    <a href="{{ url_for('web_ui.index') }}" class="nav-link {% if request.endpoint == 'web_ui.index' %}active{% endif %}">Dashboard</a>
+                    <a href="{{ url_for('web_ui.tags') }}" class="nav-link {% if request.endpoint == 'web_ui.tags' %}active{% endif %}">Tags</a>
+                    <a href="{{ url_for('web_ui.tag_generator') }}" class="nav-link {% if request.endpoint == 'web_ui.tag_generator' %}active{% endif %}">Tag Generator</a>
+                    <a href="{{ url_for('web_ui.publishers') }}" class="nav-link {% if request.endpoint == 'web_ui.publishers' %}active{% endif %}">Publishers</a>
+                    <a href="{{ url_for('web_ui.alarms') }}" class="nav-link {% if request.endpoint == 'web_ui.alarms' %}active{% endif %}">Alarms</a>
+                    <a href="{{ url_for('web_ui.config') }}" class="nav-link {% if request.endpoint == 'web_ui.config' %}active{% endif %}">Config</a>
+                </nav>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+                    <span id="theme-toggle-icon">☀️</span>
+                </button>
+                <div class="company-logo-container">
+                    <img src="{{ url_for('web_ui.static', filename='images/fireball.png') }}"
+                         alt="Fireball Industries" class="company-logo-image" />
+                </div>
             </div>
         </div>
 
@@ -71,11 +53,47 @@
         <div class="main-content">
             {% block content %}{% endblock %}
         </div>
+
+        <!-- Status Footer -->
+        <div class="status-footer">
+            <span>EmberNET Emberburn v1.0</span>
+            <span>OPC UA: <span id="opcua-status" class="status-dot dot-green"></span> Running</span>
+            <span>© 2026 Fireball Industries</span>
+        </div>
     </div>
 
     <!-- Core JavaScript -->
     <script src="{{ url_for('web_ui.static', filename='js/api.js') }}"></script>
     <script src="{{ url_for('web_ui.static', filename='js/app.js') }}"></script>
+    <script>
+    // Theme toggle
+    function toggleTheme() {
+        var isLight = document.body.classList.toggle('light-mode');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+
+        var logo = document.getElementById('header-logo');
+        if (logo) {
+            logo.src = isLight
+                ? "{{ url_for('web_ui.static', filename='images/embernet.png') }}"
+                : "{{ url_for('web_ui.static', filename='images/embernet-white.png') }}";
+        }
+
+        var icon = document.getElementById('theme-toggle-icon');
+        if (icon) {
+            icon.textContent = isLight ? '🌙' : '☀️';
+        }
+    }
+
+    // Sync icon on load
+    (function () {
+        if (document.body.classList.contains('light-mode')) {
+            var icon = document.getElementById('theme-toggle-icon');
+            if (icon) icon.textContent = '🌙';
+            var logo = document.getElementById('header-logo');
+            if (logo) logo.src = "{{ url_for('web_ui.static', filename='images/embernet.png') }}";
+        }
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -499,6 +499,193 @@ class RESTAPIPublisher(DataPublisher):
             except Exception as e:
                 self.logger.error(f"Error generating metrics: {e}")
                 return jsonify({"error": str(e)}), 500
+
+        # ── Tag Generator CRUD Endpoints ──
+
+        @self.app.route('/api/tags/create', methods=['POST'])
+        def create_tag():
+            """Create a new OPC UA tag."""
+            try:
+                data = request.get_json()
+                name = data.get('name')
+                if not name:
+                    return jsonify({"error": "Tag name is required"}), 400
+
+                initial_value = data.get('initial_value', 0)
+                tag_type = data.get('type', 'float')
+
+                # Convert value to correct type
+                if tag_type == 'float':
+                    try:
+                        initial_value = float(initial_value)
+                    except (ValueError, TypeError):
+                        initial_value = 0.0
+                elif tag_type == 'int':
+                    try:
+                        initial_value = int(initial_value)
+                    except (ValueError, TypeError):
+                        initial_value = 0
+                elif tag_type == 'bool':
+                    if isinstance(initial_value, str):
+                        initial_value = initial_value.lower() in ('true', '1', 'yes')
+                    else:
+                        initial_value = bool(initial_value)
+                else:
+                    initial_value = str(initial_value)
+
+                # Create via write_callback (which calls OPCUAServer.write_tag)
+                if self.write_callback:
+                    success = self.write_callback(name, initial_value)
+                    if success:
+                        # Store metadata
+                        if not hasattr(self, 'tag_metadata'):
+                            self.tag_metadata = {}
+                        self.tag_metadata[name] = {
+                            'type': tag_type,
+                            'description': data.get('description', ''),
+                            'units': data.get('units', ''),
+                            'category': data.get('category', 'general'),
+                            'min': data.get('min'),
+                            'max': data.get('max'),
+                            'simulate': data.get('simulate', False),
+                            'simulation_type': data.get('simulation_type', 'static'),
+                            'access': data.get('access', 'readwrite'),
+                            'quality': 'Good',
+                            'writable': data.get('access', 'readwrite') == 'readwrite'
+                        }
+                        return jsonify({"success": True, "tag": name, "value": initial_value})
+                    else:
+                        return jsonify({"error": "Failed to create tag on OPC UA server"}), 500
+
+                return jsonify({"error": "Write not supported"}), 501
+            except Exception as e:
+                self.logger.error(f"Error creating tag: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/tags/<tag_name>', methods=['DELETE'])
+        def delete_tag(tag_name):
+            """Delete a tag (remove from cache and metadata)."""
+            try:
+                if tag_name in self.tag_cache:
+                    del self.tag_cache[tag_name]
+                if hasattr(self, 'tag_metadata') and tag_name in self.tag_metadata:
+                    del self.tag_metadata[tag_name]
+                return jsonify({"success": True, "deleted": tag_name})
+            except Exception as e:
+                self.logger.error(f"Error deleting tag: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/tags/bulk', methods=['POST'])
+        def bulk_create_tags():
+            """Bulk create multiple tags."""
+            try:
+                data = request.get_json()
+                tags = data.get('tags', [])
+                if not tags:
+                    return jsonify({"error": "No tags provided"}), 400
+
+                created = []
+                errors = []
+
+                for tag_data in tags:
+                    name = tag_data.get('name')
+                    if not name:
+                        errors.append({"error": "Missing name", "data": tag_data})
+                        continue
+
+                    initial_value = tag_data.get('initial_value', 0)
+                    tag_type = tag_data.get('type', 'float')
+
+                    # Convert type
+                    if tag_type == 'float':
+                        try:
+                            initial_value = float(initial_value)
+                        except (ValueError, TypeError):
+                            initial_value = 0.0
+                    elif tag_type == 'int':
+                        try:
+                            initial_value = int(initial_value)
+                        except (ValueError, TypeError):
+                            initial_value = 0
+                    elif tag_type == 'bool':
+                        if isinstance(initial_value, str):
+                            initial_value = initial_value.lower() in ('true', '1', 'yes')
+                        else:
+                            initial_value = bool(initial_value)
+
+                    if self.write_callback:
+                        success = self.write_callback(name, initial_value)
+                        if success:
+                            # Store metadata
+                            if not hasattr(self, 'tag_metadata'):
+                                self.tag_metadata = {}
+                            self.tag_metadata[name] = {
+                                'type': tag_type,
+                                'description': tag_data.get('description', ''),
+                                'units': tag_data.get('units', ''),
+                                'category': tag_data.get('category', 'general'),
+                                'min': tag_data.get('min'),
+                                'max': tag_data.get('max'),
+                                'simulate': tag_data.get('simulate', False),
+                                'simulation_type': tag_data.get('simulation_type', 'static'),
+                                'quality': 'Good',
+                                'writable': True
+                            }
+                            created.append(name)
+                        else:
+                            errors.append({"name": name, "error": "Write failed"})
+                    else:
+                        errors.append({"name": name, "error": "Write not supported"})
+
+                return jsonify({
+                    "success": True,
+                    "created": len(created),
+                    "errors": len(errors),
+                    "created_tags": created,
+                    "error_details": errors
+                })
+            except Exception as e:
+                self.logger.error(f"Error in bulk create: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/tags/export', methods=['GET'])
+        def export_tags():
+            """Export all tags as JSON or CSV."""
+            try:
+                fmt = request.args.get('format', 'json')
+                metadata_dict = getattr(self, 'tag_metadata', {})
+
+                tags_list = []
+                for tag_name, tag_data in self.tag_cache.items():
+                    meta = metadata_dict.get(tag_name, {})
+                    tags_list.append({
+                        'name': tag_name,
+                        'value': tag_data.get('value'),
+                        'type': meta.get('type', 'unknown'),
+                        'units': meta.get('units', ''),
+                        'description': meta.get('description', ''),
+                        'category': meta.get('category', 'general'),
+                        'min': meta.get('min'),
+                        'max': meta.get('max')
+                    })
+
+                if fmt == 'csv':
+                    import io
+                    import csv
+                    output = io.StringIO()
+                    writer = csv.DictWriter(output, fieldnames=['name', 'value', 'type', 'units', 'description', 'category', 'min', 'max'])
+                    writer.writeheader()
+                    writer.writerows(tags_list)
+                    csv_content = output.getvalue()
+                    return csv_content, 200, {
+                        'Content-Type': 'text/csv',
+                        'Content-Disposition': 'attachment; filename=tags_export.csv'
+                    }
+                else:
+                    return jsonify({"tags": tags_list, "count": len(tags_list)})
+            except Exception as e:
+                self.logger.error(f"Error exporting tags: {e}")
+                return jsonify({"error": str(e)}), 500
     
     def start(self):
         """Start the REST API server."""

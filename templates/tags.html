@@ -1,26 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Tag Monitor - EmberBurn{% endblock %}
+{% block title %}Tag Monitor - Emberburn{% endblock %}
 
 {% block content %}
-<div class="header">
+<div class="page-header">
     <h1>🏷️ Tag Discovery & Monitor</h1>
     <p>Browse and monitor all available tags with metadata</p>
 </div>
 
 <div class="controls" style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
     <div style="flex: 1; min-width: 200px;">
-        <label for="tag-search" style="display: block; margin-bottom: 5px; color: var(--flame-orange);">Search Tags:</label>
-        <input type="text" id="tag-search" placeholder="Type to search..." 
-               style="width: 100%; padding: 8px; background: var(--card-bg); border: 1px solid var(--flame-orange); 
-                      color: var(--text-primary); border-radius: 4px;">
+        <label for="tag-search" style="display: block; margin-bottom: 5px; color: var(--ember-red);">Search
+            Tags:</label>
+        <input type="text" id="tag-search" placeholder="Type to search..." class="form-input">
     </div>
-    
+
     <div style="flex: 1; min-width: 200px;">
-        <label for="category-filter" style="display: block; margin-bottom: 5px; color: var(--flame-orange);">Filter by Category:</label>
-        <select id="category-filter" 
-                style="width: 100%; padding: 8px; background: var(--card-bg); border: 1px solid var(--flame-orange); 
-                       color: var(--text-primary); border-radius: 4px;">
+        <label for="category-filter" style="display: block; margin-bottom: 5px; color: var(--ember-red);">Filter by
+            Category:</label>
+        <select id="category-filter" class="form-select">
             <option value="all">All Categories</option>
         </select>
     </div>

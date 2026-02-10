@@ -58,6 +58,49 @@ class EmberBurnAPI {
     async healthCheck() {
         return this.fetchJSON('/health');
     }
+
+    // ── Tag Generator CRUD ──
+
+    async createTag(tagData) {
+        return this.fetchJSON('/tags/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tagData)
+        });
+    }
+
+    async deleteTag(tagName) {
+        return this.fetchJSON(`/tags/${tagName}`, {
+            method: 'DELETE'
+        });
+    }
+
+    async updateTag(tagName, data) {
+        return this.fetchJSON(`/tags/${tagName}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    async bulkCreateTags(tags) {
+        return this.fetchJSON('/tags/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: tags })
+        });
+    }
+
+    async exportTags(format) {
+        return this.fetchJSON(`/tags/export?format=${format || 'json'}`);
+    }
+
+    async importTags(formData) {
+        return this.fetchJSON('/tags/import', {
+            method: 'POST',
+            body: formData
+        });
+    }
 }
 
 // Create global API instance

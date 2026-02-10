@@ -46,7 +46,7 @@ Selector labels
 {{- define "emberburn.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "emberburn.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-app: emberburn
+app: {{ include "emberburn.fullname" . }}
 {{- end }}
 
 {{/*
@@ -60,12 +60,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{/*
-Get the namespace
-*/}}
-{{- define "emberburn.namespace" -}}
-{{- .Values.namespace.name | default .Release.Namespace }}
-{{- end }}
+
 
 {{/*
 Get resource requests and limits based on preset

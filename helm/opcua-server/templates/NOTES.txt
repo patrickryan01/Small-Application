@@ -6,30 +6,30 @@
     {{- end }}
   {{- end }}
 {{- else if contains "NodePort" .Values.service.webui.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ include "emberburn.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "emberburn.fullname" . }})
-  export NODE_IP=$(kubectl get nodes --namespace {{ include "emberburn.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "emberburn.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo "EmberBurn Web UI: http://$NODE_IP:$NODE_PORT"
 {{- else if contains "LoadBalancer" .Values.service.webui.type }}
   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
         You can watch the status by running:
         
-        kubectl --namespace {{ include "emberburn.namespace" . }} get services -w {{ include "emberburn.fullname" . }}
+        kubectl --namespace {{ .Release.Namespace }} get services -w {{ include "emberburn.fullname" . }}
   
-  export SERVICE_IP=$(kubectl get svc --namespace {{ include "emberburn.namespace" . }} {{ include "emberburn.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "emberburn.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo "EmberBurn Web UI: http://$SERVICE_IP:{{ .Values.service.webui.port }}"
 {{- else if contains "ClusterIP" .Values.service.webui.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ include "emberburn.namespace" . }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
   echo "EmberBurn Web UI: http://127.0.0.1:5000"
-  kubectl --namespace {{ include "emberburn.namespace" . }} port-forward $POD_NAME 5000:5000
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 5000:5000
 {{- end }}
 
 2. OPC UA Server Connection:
 
-   Endpoint: opc.tcp://{{ include "emberburn.fullname" . }}-opcua.{{ include "emberburn.namespace" . }}.svc.cluster.local:4840/freeopcua/server/
+   Endpoint: opc.tcp://{{ include "emberburn.fullname" . }}-opcua.{{ .Release.Namespace }}.svc.cluster.local:4840/freeopcua/server/
    
    {{- if eq .Values.service.opcua.type "LoadBalancer" }}
    External Endpoint (after LoadBalancer provisioned):
-   export OPCUA_IP=$(kubectl get svc --namespace {{ include "emberburn.namespace" . }} {{ include "emberburn.fullname" . }}-opcua --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+   export OPCUA_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "emberburn.fullname" . }}-opcua --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
    echo "OPC UA: opc.tcp://$OPCUA_IP:4840/freeopcua/server/"
    {{- end }}
 
@@ -57,13 +57,13 @@
 4. Quick Status Check:
 
    # Check deployment status
-   kubectl get all -n {{ include "emberburn.namespace" . }}
+   kubectl get all -n {{ .Release.Namespace }}
    
    # View logs
-   kubectl logs -f -n {{ include "emberburn.namespace" . }} -l app=emberburn
+   kubectl logs -f -n {{ .Release.Namespace }} -l app=emberburn
    
    # Check resource usage
-   kubectl top pod -n {{ include "emberburn.namespace" . }}
+   kubectl top pod -n {{ .Release.Namespace }}
 
 5. API Endpoints:
 
@@ -98,17 +98,17 @@
 7. Common Operations:
 
    # Restart EmberBurn
-   kubectl rollout restart deployment/{{ include "emberburn.fullname" . }} -n {{ include "emberburn.namespace" . }}
+   kubectl rollout restart deployment/{{ include "emberburn.fullname" . }} -n {{ .Release.Namespace }}
    
    # Scale deployment
-   kubectl scale deployment/{{ include "emberburn.fullname" . }} --replicas=2 -n {{ include "emberburn.namespace" . }}
+   kubectl scale deployment/{{ include "emberburn.fullname" . }} --replicas=2 -n {{ .Release.Namespace }}
    
    # View configuration
-   kubectl get configmap -n {{ include "emberburn.namespace" . }}
+   kubectl get configmap -n {{ .Release.Namespace }}
    
    # Access database (if persistence enabled)
    {{- if .Values.persistence.enabled }}
-   kubectl exec -it -n {{ include "emberburn.namespace" . }} deployment/{{ include "emberburn.fullname" . }} -- sqlite3 /app/data/emberburn.db
+   kubectl exec -it -n {{ .Release.Namespace }} deployment/{{ include "emberburn.fullname" . }} -- sqlite3 /app/data/emberburn.db
    {{- end }}
 
 8. Persistent Storage:
@@ -146,13 +146,13 @@
 10. Troubleshooting:
 
     # Pod not starting?
-    kubectl describe pod -n {{ include "emberburn.namespace" . }} -l app=emberburn
+    kubectl describe pod -n {{ .Release.Namespace }} -l app=emberburn
     
     # PVC not binding?
-    kubectl describe pvc -n {{ include "emberburn.namespace" . }} {{ include "emberburn.pvcName" . }}
+    kubectl describe pvc -n {{ .Release.Namespace }} {{ include "emberburn.pvcName" . }}
     
     # Check events
-    kubectl get events -n {{ include "emberburn.namespace" . }} --sort-by=.lastTimestamp
+    kubectl get events -n {{ .Release.Namespace }} --sort-by=.lastTimestamp
     
     # Test OPC UA connection
     kubectl run -it --rm opcua-test --image=python:3.11-slim --restart=Never -- bash

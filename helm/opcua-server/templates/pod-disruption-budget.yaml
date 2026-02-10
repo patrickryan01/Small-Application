@@ -3,7 +3,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "emberburn.fullname" . }}
-  namespace: {{ include "emberburn.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
 spec:

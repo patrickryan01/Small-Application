@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "emberburn.fullname" . }}
-  namespace: {{ include "emberburn.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
 spec:

@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "emberburn.fullname" . }}
-  namespace: {{ include "emberburn.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
     {{- with .Values.monitoring.serviceMonitor.labels }}
