@@ -8,21 +8,21 @@ entries:
       catalog.cattle.io/featured: "true"
       catalog.cattle.io/provides-gvr: apps/v1/Deployment
       catalog.cattle.io/release-name: emberburn
-      catalog.cattle.io/upstream-version: 1.0.3
+      catalog.cattle.io/upstream-version: 3.5.0
       fireball.industries/branding: emberburn
       fireball.industries/project-type: industrial-iot-gateway
       fireball.industries/protocols: "15"
       fireball.industries/web-ui: "true"
     apiVersion: v2
-    appVersion: 1.0.3
-    created: "2026-01-26T15:14:08.708117-03:00"
+    appVersion: 3.5.0
+    created: "2026-02-10T15:54:17.6286927-05:00"
     description: 'OPC UA Industrial IoT Gateway with 15 protocol support and fire-themed
       web UI. Because your industrial data deserves to be as hot as your infrastructure.  EmberBurn
       is a multi-protocol industrial IoT gateway featuring OPC UA server, MQTT, REST
       API, GraphQL, Sparkplug B, Kafka, AMQP, WebSocket, Modbus TCP, Prometheus metrics,
       InfluxDB integration, alarms, data transformation, SQLite persistence, and a
       beautiful Python Flask web UI for configuration and monitoring. '
-    digest: 148329a55f5663298361802ec95a44ae15ae703d4666f136703ecb1b710fc68a
+    digest: ba241813a853e9ba7f8105c3e41ad14c9446e003aefb067956e953ed4fc27278
     home: https://fireballz.ai/emberburn
     icon: https://fireballindustries.com/assets/emberburn-icon.svg
     keywords:
@@ -47,61 +47,6 @@ entries:
     - https://github.com/Embernet-ai/Small-Application
     type: application
     urls:
-    - emberburn-1.0.6.tgz
-    version: 1.0.6
-  - annotations:
-      catalog.cattle.io/architecture: amd64,arm64
-      catalog.cattle.io/auto-install: emberburn=match
-      catalog.cattle.io/categories: Forge Industrial,IoT Gateway,SCADA,OPC UA,Monitoring
-      catalog.cattle.io/certified: fireball
-      catalog.cattle.io/display-name: EmberBurn - Multi-Protocol IoT Gateway
-      catalog.cattle.io/featured: "true"
-      catalog.cattle.io/hidden: "false"
-      catalog.cattle.io/kube-version: '>=1.25.0'
-      catalog.cattle.io/namespace: emberburn
-      catalog.cattle.io/os: linux
-      catalog.cattle.io/provides-gvr: apps/v1/Deployment
-      catalog.cattle.io/rancher-version: '>=2.6.0'
-      catalog.cattle.io/release-name: emberburn
-      catalog.cattle.io/upstream-version: 1.0.3
-      fireball.industries/branding: emberburn
-      fireball.industries/project-type: industrial-iot-gateway
-      fireball.industries/protocols: "15"
-      fireball.industries/web-ui: "true"
-    apiVersion: v2
-    appVersion: 1.0.3
-    created: "2026-01-26T15:14:08.704131-03:00"
-    description: 'OPC UA Industrial IoT Gateway with 15 protocol support and fire-themed
-      web UI. Because your industrial data deserves to be as hot as your infrastructure.  EmberBurn
-      is a multi-protocol industrial IoT gateway featuring OPC UA server, MQTT, REST
-      API, GraphQL, Sparkplug B, Kafka, AMQP, WebSocket, Modbus TCP, Prometheus metrics,
-      InfluxDB integration, alarms, data transformation, SQLite persistence, and a
-      beautiful Python Flask web UI for configuration and monitoring. '
-    digest: 5d540db5f3e20c2ce22f8378c541807e61dc1bb80b62bcc9173fdb092ff05347
-    home: https://fireballz.ai/emberburn
-    icon: https://fireballindustries.com/assets/emberburn-icon.svg
-    keywords:
-    - opcua
-    - industrial-iot
-    - scada
-    - mqtt
-    - modbus
-    - prometheus
-    - graphql
-    - data-transformation
-    - emberburn
-    - fireball-industries
-    - forge-industrial
-    maintainers:
-    - email: patrick@fireball-industries.com
-      name: Patrick Ryan
-      url: https://fireballz.ai
-    name: emberburn
-    sources:
-    - https://github.com/Embernet-ai/helm-charts
-    - https://github.com/Embernet-ai/Small-Application
-    type: application
-    urls:
-    - emberburn-1.0.5.tgz
-    version: 1.0.5
-generated: "2026-01-26T15:14:08.700941-03:00"
+    - https://fireball-industries.github.io/helm-charts/emberburn-3.5.0.tgz
+    version: 3.5.0
+generated: "2026-02-10T15:54:17.625087-05:00"
