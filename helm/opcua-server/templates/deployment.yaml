@@ -54,11 +54,13 @@ spec:
         image: "{{ .Values.emberburn.image.repository }}:{{ .Values.emberburn.image.tag }}"
         imagePullPolicy: {{ .Values.emberburn.image.pullPolicy }}
         ports:
-        - name: opcua
-          containerPort: {{ .Values.emberburn.ports.opcua }}
-          protocol: TCP
+        # IMPORTANT: webui MUST be the first port listed.
+        # The Embernet Dashboard picks the first containerPort for "Launch UI" proxy.
         - name: webui
           containerPort: {{ .Values.emberburn.ports.webui }}
+          protocol: TCP
+        - name: opcua
+          containerPort: {{ .Values.emberburn.ports.opcua }}
           protocol: TCP
         - name: prometheus
           containerPort: {{ .Values.emberburn.ports.prometheus }}

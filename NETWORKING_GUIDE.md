@@ -159,7 +159,24 @@ The `embernet.io/store-app: "true"` label is **required**. Without it, the dashb
 
 **You MUST declare at least one `containerPort`.** The dashboard iterates `pod.Spec.Containers[].Ports` to detect if your app has a GUI. If `ports:` is missing or empty, your app card will have **no "Launch UI" button**.
 
-The **first** port found becomes the proxy target. If your app serves its web UI on a non-standard port, make sure that port is listed first.
+> [!CAUTION]
+> **The FIRST port listed becomes the "Launch UI" proxy target.** For multi-port apps (e.g., OPC UA + Web UI + Prometheus), the web UI / HTTP port **MUST be listed first**. If a non-HTTP port (like OPC UA binary on 4840) is first, the dashboard will try to reverse-proxy to a binary protocol and fail with `dial tcp: connection refused` or garbage responses.
+
+**Correct order for multi-port apps:**
+```yaml
+          ports:
+            # Web UI MUST be first — dashboard picks this for "Launch UI"
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            # Industrial protocol ports listed after
+            - name: opcua
+              containerPort: 4840
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8000
+              protocol: TCP
+```
 
 ### 2e. Full Deployment Template (Copy-Paste Starting Point)
 
