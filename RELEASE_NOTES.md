@@ -1,5 +1,17 @@
 # EmberBurn Release Notes
 
+## v3.9.0 — 2026-02-11
+
+### Fix: GHCR 403 Forbidden (Image Pull Failure)
+
+- **Root cause**: Dockerfile `org.opencontainers.image.source` label pointed to `Embernet-ai/Small-Application` (non-existent). GHCR uses this label to link packages to repositories — unlinked packages default to **private**, causing 403 on pull.
+- **Fix**: Corrected label to `https://github.com/Embernet-ai/Emberburn` (the actual org repo name).
+- **Action required**: GHCR package visibility must be set to **Public** via org package settings after first successful build.
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.9.0`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.9.0` tag
+
+---
+
 ## v3.5.8 — 2026-02-10
 
 ### Feature: Proxy-Aware Static Asset Loading

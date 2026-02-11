@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-LABEL org.opencontainers.image.source="https://github.com/Embernet-ai/Small-Application"
+LABEL org.opencontainers.image.source="https://github.com/Embernet-ai/Emberburn"
 LABEL org.opencontainers.image.description="EmberBurn Industrial IoT Gateway"
 LABEL maintainer="patrick@fireball-industries.com"
 
