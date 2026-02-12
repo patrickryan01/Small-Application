@@ -1,5 +1,16 @@
 # EmberBurn Release Notes
 
+## v3.10.3 — 2026-02-12
+
+### Updates
+
+- Clean release to verify attestation fix from v3.10.2
+- Should pull successfully without manual GHCR visibility toggle
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.10.3`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.3` tag
+
+---
+
 ## v3.10.2 — 2026-02-12
 
 ### Fix: ImagePullBackOff / 403 Forbidden on GHCR (Again)
