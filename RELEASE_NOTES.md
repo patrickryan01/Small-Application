@@ -1,5 +1,20 @@
 # EmberBurn Release Notes
 
+## v4.0.4 — 2026-02-12
+
+### Cleanup: Remove broken releases, fix workflow triggers
+
+- **Removed** old broken releases (v4.0.1, v4.0.2, v4.0.3) and their tgz files from the repo
+- **Cleaned** index.yaml to only contain the current version
+- **Docker workflow** now only triggers on `v*` tags and `workflow_dispatch` — no more branch pushes or release events causing racing builds
+- **Note**: CodeQL "Push on main" and built-in "pages build and deployment" are GitHub repo settings — disable CodeQL in Settings > Code Security, and set Pages source to "GitHub Actions" in Settings > Pages
+- **Chart version**: `4.0.4`, appVersion: `4.0.4`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.4`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.4.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.4` tag
+
+---
+
 ## v4.0.3 — 2026-02-12
 
 ### Fix: Workflow triggers causing image overwrites
