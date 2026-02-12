@@ -1,5 +1,15 @@
 # EmberBurn Release Notes
 
+## v3.10.2 — 2026-02-12
+
+### Updates
+
+- Version bump to 3.10.2
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.2` tag
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.10.2`
+
+---
+
 ## v3.10.1 — 2026-02-12
 
 ### Fix: ImagePullBackOff / 403 Forbidden on GHCR
