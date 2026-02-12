@@ -75,6 +75,7 @@ All must pass before committing:
 ## 6. Release Notes
 
 - [ ] Add entry to `RELEASE_NOTES.md` at the top with date and changes
+- [ ] **KEEP ONLY PREVIOUS VERSIONS** — Remove the current version entry from `RELEASE_NOTES.md` before committing (release notes document history, not the current release)
 
 ---
 
