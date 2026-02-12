@@ -1,5 +1,20 @@
 # EmberBurn Release Notes
 
+## v4.0.0 — 2026-02-12
+
+### Major Release: Complete Helm Chart + Container Image
+
+- **Breaking**: Major version bump to signal production-ready release
+- **Helm Chart**: Packaged tarball with proper index.yaml for Helm repository
+- **Container Image**: Multi-arch (amd64/arm64) build with working GHCR permissions
+- **Workflow**: Cleaned permissions - no attestation features causing private package defaults
+- **Chart version**: `4.0.0`, appVersion: `4.0.0`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.0`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.0.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.0` tag
+
+---
+
 ## v3.10.4 — 2026-02-12
 
 ### Fix: ImagePullBackOff / 403 Forbidden (Final Fix)

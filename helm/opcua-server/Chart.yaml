@@ -10,8 +10,8 @@ description: |
   persistence, and a beautiful Python Flask web UI for configuration and monitoring.
 
 type: application
-version: 3.10.3
-appVersion: "3.10.3"
+version: 4.0.0
+appVersion: "4.0.0"
 
 keywords:
   - opcua
