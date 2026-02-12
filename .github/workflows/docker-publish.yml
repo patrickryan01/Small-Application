@@ -2,12 +2,7 @@ name: Build EmberBurn Docker Image (Multi-Architecture)
 
 on:
   push:
-    branches: [main, master]
     tags: ["v*"]
-  release:
-    types: [published]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 env:

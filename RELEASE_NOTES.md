@@ -1,5 +1,18 @@
 # EmberBurn Release Notes
 
+## v4.0.3 — 2026-02-12
+
+### Fix: Workflow triggers causing image overwrites
+
+- **Root cause**: Docker build workflow triggered on `push to main`, `v* tags`, AND `release published` — causing 3 simultaneous builds that raced and overwrote the working `latest` manifest with a broken one
+- **Fix**: Stripped workflow down to only trigger on `v*` tags and `workflow_dispatch`. No more branch push or release event builds.
+- **Chart version**: `4.0.3`, appVersion: `4.0.3`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.3`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.3.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.3` tag
+
+---
+
 ## v4.0.2 — 2026-02-12
 
 ### Fix: Image tag 4.0.1 never published — 403 on pull
