@@ -2,11 +2,13 @@
 
 ## v3.10.2 — 2026-02-12
 
-### Updates
+### Fix: ImagePullBackOff / 403 Forbidden on GHCR (Again)
 
-- Version bump to 3.10.2
-- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.2` tag
+- **Root cause**: `actions/attest-build-provenance@v1` with `push-to-registry: true` creates a **separate SHA-tagged manifest** before the semver-tagged manifest. GHCR links the SHA manifest as a distinct image with private permissions, causing 403 when K8s tries to pull the semver tag that resolves to the SHA digest.
+- **Fix**: Disabled attestation step in workflow. Attestations are useful for supply chain security but break GHCR image pulls.
+- **Evidence**: Two manifests in GHCR for same digest - one with `sha256-...` tag (0 downloads, private), one with `3.10.2`/`latest` tags (1 download, works after manual public toggle).
 - Image tag: `ghcr.io/embernet-ai/emberburn:3.10.2`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.2` tag
 
 ---
 

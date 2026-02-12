@@ -72,14 +72,15 @@ jobs:
           provenance: false
           sbom: false
 
-      - name: Generate artifact attestation
-        if: github.event_name != 'pull_request' && github.repository_owner == 'embernet-ai'
-        continue-on-error: true
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+      # DISABLED: Attestation creates duplicate SHA-tagged manifests that cause 403 on pull
+      # - name: Generate artifact attestation
+      #   if: github.event_name != 'pull_request' && github.repository_owner == 'embernet-ai'
+      #   continue-on-error: true
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      #     subject-digest: ${{ steps.build.outputs.digest }}
+      #     push-to-registry: true
 
       - name: Inspect multi-arch manifest
         if: github.event_name != 'pull_request'
