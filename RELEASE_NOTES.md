@@ -1,12 +1,24 @@
 # EmberBurn Release Notes
 
-## v3.10.3 — 2026-02-12
+## v3.10.4 — 2026-02-12
+
+### Fix: ImagePullBackOff / 403 Forbidden (Final Fix)
+
+- **Root cause**: Workflow still had `id-token: write` and `attestations: write` permissions even though attestation step was disabled. GHCR treats packages with attestation permissions as "security-sensitive" and defaults them to **private** visibility on every new tag.
+- **Fix**: Removed `id-token: write` and `attestations: write` permissions from workflow entirely. Only `contents: read` and `packages: write` remain.
+- **Manual action still required**: Until GitHub fixes this behavior, new tags may still default to private. Set package visibility to Public at: `https://github.com/orgs/Embernet-ai/packages/container/emberburn/settings`
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.10.4`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.4` tag
+
+---
+
+## v3.10.3 — 2026-02-12 ⚠️ FAILED
 
 ### Updates
 
 - Clean release to verify attestation fix from v3.10.2
-- Should pull successfully without manual GHCR visibility toggle
-- Image tag: `ghcr.io/embernet-ai/emberburn:3.10.3`
+- **Result**: Still got 403 Forbidden - attestation permissions caused private package visibility
+- Image tag: `ghcr.io/embernet-ai/emberburn:3.10.3` (requires manual public toggle)
 - Multi-arch build (amd64/arm64) via GitHub Actions on `v3.10.3` tag
 
 ---
