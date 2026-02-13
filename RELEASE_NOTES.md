@@ -1,5 +1,20 @@
 # EmberBurn Release Notes
 
+## v4.0.5 — 2026-02-13
+
+### Fix: Docker tags only from tagged releases
+
+- **Fixed** Docker metadata to stop generating a `main` branch tag that raced with the versioned tag build
+- **Removed** `type=ref,event=branch` and `type=ref,event=pr` from workflow metadata — only semver tags are generated now
+- **Changed** `latest` condition to explicitly require a `v*` tag ref instead of `is_default_branch`
+- **Result**: Pushing a `v*` tag now produces only `X.Y.Z`, `X.Y`, and `latest` — no more phantom `main` image
+- **Chart version**: `4.0.5`, appVersion: `4.0.5`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.5`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.5.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.5` tag
+
+---
+
 ## v4.0.4 — 2026-02-12
 
 ### Cleanup: Remove broken releases, fix workflow triggers
