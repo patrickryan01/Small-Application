@@ -7,6 +7,7 @@ metadata:
   labels:
     {{- include "emberburn.labels" . | nindent 4 }}
     service-type: webui
+    embernet.ai/app-name: {{ .Values.embernet.appName | default .Chart.Name | quote }}
     {{- with .Values.service.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
