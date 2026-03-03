@@ -26,16 +26,26 @@ spec:
         embernet.ai/app-icon: {{ .Values.embernet.appIcon | default "fireball.png" | quote }}
         embernet.ai/gui-port: {{ .Values.emberburn.ports.webui | quote }}
         embernet.ai/gui-type: {{ .Values.embernet.guiType | default "web" | quote }}
+        {{- if .Values.embernet.device }}
+        embernet.ai/device: {{ .Values.embernet.device | quote }}
+        {{- end }}
         {{- with .Values.pod.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
         checksum/tags: {{ include (print $.Template.BasePath "/configmap-tags.yaml") . | sha256sum }}
         checksum/publishers: {{ include (print $.Template.BasePath "/configmap-publishers.yaml") . | sha256sum }}
+        {{- if .Values.embernet.displayName }}
+        embernet.ai/display-name: {{ .Values.embernet.displayName | quote }}
+        {{- end }}
         {{- with .Values.pod.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "emberburn.serviceAccountName" . }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
