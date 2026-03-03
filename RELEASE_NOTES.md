@@ -1,5 +1,22 @@
 # EmberBurn Release Notes
 
+## v4.0.7 — 2026-03-03
+
+### Flux Mesh Integration — Auto-Discovery Annotations
+
+- **Added** `flux.embernet.ai/*` annotations to all three Service templates (webui, opcua, prometheus)
+- **Added** `flux:` values block to `values.yaml` with `expose`, `serviceName`, `port`, `roleAttributes`
+- **Web UI** service exposed on the Flux mesh by default (`flux.expose: true`)
+- **OPC UA** and **Prometheus** services opt-in via `flux.exposeOpcua` / `flux.exposeMetrics`
+- Edge tunnel auto-discovers annotated services — zero per-site configuration required
+- Aligns with [flux_operability.md](docs/flux_operability.md) specification
+- **Chart version**: `4.0.7`, appVersion: `4.0.7`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.7`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.7.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.7` tag
+
+---
+
 ## v4.0.6 — 2026-03-03
 
 ### Helm Chart Enhancements & Template Improvements

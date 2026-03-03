@@ -23,7 +23,7 @@ pod:
 emberburn:
   image:
     repository: ghcr.io/embernet-ai/emberburn
-    tag: "4.0.6"
+    tag: "4.0.7"
     pullPolicy: IfNotPresent # Use Always for development, IfNotPresent for production
 
   # OPC UA Server configuration
@@ -311,6 +311,23 @@ ingress:
   #  - secretName: emberburn-tls
   #    hosts:
   #      - emberburn.example.com
+
+# Flux mesh integration — auto-discovered by the edge tunnel
+# See: docs/flux_operability.md
+flux:
+  # -- Expose the Web UI service on the Flux mesh
+  expose: true
+  # -- Service name used in the Flux virtual address
+  # Final address: <serviceName>-<site>-<node>.flux.internal
+  serviceName: ""  # defaults to Chart.Name ("emberburn")
+  # -- Port to expose through the mesh (defaults to service.webui.port)
+  port: 5000
+  # -- Role attributes for policy matching
+  roleAttributes: "gui-services"
+  # -- Also expose the OPC UA service on the Flux mesh
+  exposeOpcua: false
+  # -- Also expose the Prometheus metrics service on the Flux mesh
+  exposeMetrics: false
 
 # Embernet Dashboard integration
 embernet:
