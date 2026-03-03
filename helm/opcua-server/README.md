@@ -235,6 +235,76 @@ temperature := opcClient.ReadVariable('Temperature');
 
 Add data source: `http://emberburn-prometheus.emberburn.svc.cluster.local:8000`
 
+## Embernet Dashboard Integration
+
+EmberBurn ships with full [Embernet Dashboard](https://embernet.ai) integration. The chart automatically applies the required pod labels and annotations so the dashboard can discover, display, and proxy into your EmberBurn instances.
+
+### Required Labels (applied automatically)
+
+| Label | Default | Purpose |
+|-------|---------|---------|
+| `embernet.ai/store-app` | `"true"` | Makes the pod visible in the Embernet App Store / Dashboard |
+| `embernet.ai/app-name` | Chart name (`emberburn`) | Identifies the application type |
+| `embernet.ai/app-icon` | `"fireball.png"` | Icon shown on the dashboard card |
+| `embernet.ai/gui-port` | `"5000"` | Port the dashboard proxies to for the "Open" button |
+| `embernet.ai/gui-type` | `"web"` | Controls which action buttons appear (`web`, `shell`, `web+shell`, `none`) |
+
+### Optional Labels & Annotations
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `embernet.ai/display-name` | Annotation | Human-friendly name shown on the dashboard card (e.g., `"Plant Floor / EmberBurn Production"`) |
+| `embernet.ai/device` | Label | Digital twin device mapping (e.g., `"plc-conveyor-01"`) |
+
+### Configuring Embernet Values
+
+All Embernet settings live under the `embernet` key in `values.yaml`:
+
+```yaml
+embernet:
+  appName: ""              # Defaults to .Chart.Name ("emberburn")
+  displayName: ""          # Annotation: "Plant Floor / EmberBurn Production"
+  guiType: "web"           # "web" | "shell" | "web+shell" | "none"
+  device: ""               # Digital twin device: "plc-conveyor-01"
+  appIcon: "fireball.png"  # Icon filename from static/images/
+```
+
+**Example — multi-instance with device mapping:**
+
+```bash
+helm install emberburn-line1 ./emberburn \
+  --namespace factory-floor \
+  --create-namespace \
+  --set embernet.displayName="Line 1 / EmberBurn" \
+  --set embernet.device="plc-conveyor-01" \
+  --set embernet.guiType="web"
+```
+
+### Image Pull Secrets
+
+If your container image is hosted in a private registry (e.g., GHCR), configure `imagePullSecrets`:
+
+```yaml
+imagePullSecrets:
+  - name: ghcr-pull-secret
+```
+
+Or via the CLI:
+
+```bash
+helm install emberburn ./emberburn \
+  --set 'imagePullSecrets[0].name=ghcr-pull-secret'
+```
+
+### Node Selector
+
+Target specific nodes (e.g., edge/industrial-iot nodes) with `nodeSelector`:
+
+```yaml
+nodeSelector:
+  node-role.kubernetes.io/industrial-iot: "true"
+```
+
 ## Links
 
 - **Python Repository:** https://github.com/fireball-industries/Small-Application

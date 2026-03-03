@@ -143,7 +143,24 @@
    Memory Limit: {{ $resources.limits.memory }}
 {{- end }}
 
-10. Troubleshooting:
+10. Embernet Dashboard Integration:
+
+    Store App:   true
+    GUI Type:    {{ .Values.embernet.guiType | default "web" }}
+    GUI Port:    {{ .Values.emberburn.ports.webui }}
+    App Name:    {{ .Values.embernet.appName | default .Chart.Name }}
+    App Icon:    {{ .Values.embernet.appIcon | default "fireball.png" }}
+  {{- if .Values.embernet.displayName }}
+    Display Name: {{ .Values.embernet.displayName }}
+  {{- end }}
+  {{- if .Values.embernet.device }}
+    Device:      {{ .Values.embernet.device }}
+  {{- end }}
+
+    Your pod is labeled for automatic Embernet Dashboard discovery.
+    The dashboard "Open" button will proxy to port {{ .Values.emberburn.ports.webui }}.
+
+11. Troubleshooting:
 
     # Pod not starting?
     kubectl describe pod -n {{ .Release.Namespace }} -l app=emberburn
@@ -159,7 +176,7 @@
     > pip install opcua
     > python -c "from opcua import Client; c=Client('opc.tcp://{{ include "emberburn.fullname" . }}-opcua:4840/freeopcua/server/'); c.connect(); print('Connected!'); c.disconnect()"
 
-11. Documentation:
+12. Documentation:
    
     Helm Chart: https://github.com/fireball-industries/helm-charts
     EmberBurn Docs: https://fireballindustries.com/emberburn
