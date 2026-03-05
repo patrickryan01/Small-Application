@@ -1,5 +1,20 @@
 # EmberBurn Release Notes
 
+## v4.0.8 — 2026-03-04
+
+### Bug Fix & Documentation Reorganization
+
+- **Fixed** `/dashboard` route returning 500 error — now redirects to main index instead of missing template
+- **Moved** 9 documentation files from repo root to `documentation/` folder for cleaner structure
+- **Added** `App_Integration_Guide.md` — comprehensive guide for Embernet Dashboard integration
+- **Added** `GUI_DASHBOARD_TODO.md` — issue tracking and resolution documentation
+- **Chart version**: `4.0.8`, appVersion: `4.0.8`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.0.8`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.0.8.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.0.8` tag
+
+---
+
 ## v4.0.7 — 2026-03-03
 
 ### Flux Mesh Integration — Auto-Discovery Annotations
