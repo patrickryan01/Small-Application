@@ -50,6 +50,18 @@ app: {{ include "emberburn.fullname" . }}
 {{- end }}
 
 {{/*
+EmberNET Store labels — The Big Four
+Applied to BOTH pod template labels AND Service labels.
+Required for dashboard discovery via embernet.ai/store-app=true selector.
+*/}}
+{{- define "emberburn.storeLabels" -}}
+embernet.ai/store-app: "true"
+embernet.ai/gui-type: {{ .Values.gui.type | default "web" | quote }}
+embernet.ai/app-name: {{ .Values.gui.displayName | default .Chart.Name | quote }}
+embernet.ai/gui-port: {{ .Values.gui.port | default .Values.service.webui.port | default "5000" | quote }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "emberburn.serviceAccountName" -}}

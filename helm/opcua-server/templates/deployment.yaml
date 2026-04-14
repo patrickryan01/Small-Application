@@ -21,11 +21,8 @@ spec:
     metadata:
       labels:
         {{- include "emberburn.selectorLabels" . | nindent 8 }}
-        embernet.ai/store-app: "true"
-        embernet.ai/app-name: {{ .Values.embernet.appName | default .Chart.Name | quote }}
+        {{- include "emberburn.storeLabels" . | nindent 8 }}
         embernet.ai/app-icon: {{ .Values.embernet.appIcon | default "fireball.png" | quote }}
-        embernet.ai/gui-port: {{ .Values.emberburn.ports.webui | quote }}
-        embernet.ai/gui-type: {{ .Values.embernet.guiType | default "web" | quote }}
         {{- if .Values.embernet.device }}
         embernet.ai/device: {{ .Values.embernet.device | quote }}
         {{- end }}
@@ -47,6 +44,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "emberburn.serviceAccountName" . }}
+      {{- if .Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- else }}
+      dnsPolicy: ClusterFirst
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

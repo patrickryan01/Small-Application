@@ -23,7 +23,7 @@ pod:
 emberburn:
   image:
     repository: ghcr.io/embernet-ai/emberburn
-    tag: "4.0.8"
+    tag: "4.0.9"
     pullPolicy: IfNotPresent # Use Always for development, IfNotPresent for production
 
   # OPC UA Server configuration
@@ -337,6 +337,14 @@ embernet:
   device: ""               # Digital twin device: "plc-conveyor-01"
   appIcon: "fireball.png"  # Icon filename from static/images/
 
+# GUI configuration — canonical EmberNET template section
+# These values drive the storeLabels helper for dashboard discovery
+gui:
+  enabled: true
+  port: 5000               # Web UI port (matched to service.webui.port)
+  type: "web"              # "web" | "shell" | "web+shell" | "none"
+  displayName: ""          # Override app name on dashboard cards
+
 # Image pull secrets for private registries
 imagePullSecrets: []
 #  - name: ghcr-pull-secret
@@ -350,6 +358,13 @@ tolerations: []
 
 # Affinity
 affinity: {}
+
+# Network configuration — OT platform default
+# hostNetwork: true is the default for factory floor environments
+# running Podman under K3s with direct network access requirements
+network:
+  hostNetwork: true        # DEFAULT TRUE — OT platform requirement
+  extraPorts: []
 
 # Pod Disruption Budget
 podDisruptionBudget:
@@ -410,3 +425,6 @@ external:
     deploy: false
     service: "influxdb.default.svc.cluster.local"
     port: 8086
+
+# Environment variable sources (for Secrets/ConfigMaps)
+envFrom: []
