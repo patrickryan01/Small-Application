@@ -1,0 +1,114 @@
+name: Package & Publish Helm Chart
+
+# ── Trigger ──────────────────────────────────────────────────────────
+# Runs whenever chart source files change on main, or manually.
+# Does NOT trigger on index.yaml / *.tgz changes (those are outputs).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'helm/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write          # push commits back to main
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "helm-release"
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      # ── 1. Checkout with full history ──────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Install Helm ────────────────────────────────────────────
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.3
+
+      # ── 3. Read chart version ──────────────────────────────────────
+      - name: Read chart version
+        id: chart
+        run: |
+          VERSION=$(grep '^version:' helm/opcua-server/Chart.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Chart version: $VERSION"
+
+      # ── 4. Check if this version is already indexed ────────────────
+      - name: Check if already published
+        id: check
+        run: |
+          TGZ="emberburn-${{ steps.chart.outputs.version }}.tgz"
+          if [ -f "$TGZ" ] && grep -q "$TGZ" index.yaml 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⏭️  $TGZ already exists and is indexed — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "🆕 New version detected — packaging."
+          fi
+
+      # ── 5. Remove stale packages ──────────────────────────────────
+      - name: Remove old .tgz packages
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          echo "🧹 Cleaning old packages..."
+          rm -f emberburn-*.tgz
+          echo "Done."
+
+      # ── 6. Package the chart ───────────────────────────────────────
+      - name: Helm package
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          helm package helm/opcua-server -d .
+          ls -la emberburn-*.tgz
+
+      # ── 7. Rebuild the repository index ────────────────────────────
+      - name: Helm repo index
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          helm repo index . --url https://embernet-ai.github.io/Emberburn/
+          echo "--- index.yaml ---"
+          cat index.yaml
+
+      # ── 8. Commit and push ─────────────────────────────────────────
+      - name: Commit updated chart package and index
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add emberburn-*.tgz index.yaml
+          git commit -m "ci: publish emberburn-${{ steps.chart.outputs.version }} helm chart"
+          git push
+
+      # ── 9. Summary ────────────────────────────────────────────────
+      - name: Build summary
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          echo "### 🔥 Helm Chart Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Chart | \`emberburn\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ steps.chart.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | \`emberburn-${{ steps.chart.outputs.version }}.tgz\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Index URL | https://embernet-ai.github.io/Emberburn/index.yaml |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The \`pages.yml\` workflow will deploy this to GitHub Pages automatically." >> $GITHUB_STEP_SUMMARY
+
+      - name: Skip summary
+        if: steps.check.outputs.skip == 'true'
+        run: |
+          echo "### ⏭️ Helm Chart Already Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version \`${{ steps.chart.outputs.version }}\` is already packaged and indexed. No action taken." >> $GITHUB_STEP_SUMMARY

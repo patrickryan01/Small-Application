@@ -99,7 +99,14 @@ All must pass before committing:
 
 ---
 
-## 6. Helm Chart Packaging
+## 6. Helm Chart Packaging (Automated)
+
+> **As of v4.0.9:** The `release.yml` GitHub Actions workflow automatically
+> runs `helm package` and `helm repo index` whenever `helm/**` files change
+> on `main`. You no longer need to manually package or update `index.yaml`.
+> The pipeline chain is: `release.yml` → commits `.tgz` + `index.yaml` → triggers `pages.yml` → deploys to GitHub Pages → Rancher picks up the update.
+
+Manual fallback (only if CI is broken):
 
 - [ ] **Delete old `.tgz`** — `Remove-Item emberburn-*.tgz`
 - [ ] **Package** — `helm package helm/opcua-server` (run from repo root)
