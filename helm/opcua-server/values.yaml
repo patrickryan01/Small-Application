@@ -363,7 +363,7 @@ affinity: {}
 # hostNetwork: true is the default for factory floor environments
 # running Podman under K3s with direct network access requirements
 network:
-  hostNetwork: true        # DEFAULT TRUE — OT platform requirement
+  hostNetwork: false       # DEFAULT FALSE — dashboard proxy requires ClusterIP networking
   extraPorts: []
 
 # Pod Disruption Budget
