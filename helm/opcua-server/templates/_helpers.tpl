@@ -46,7 +46,7 @@ Selector labels
 {{- define "emberburn.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "emberburn.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-app: {{ include "emberburn.fullname" . }}
+app: {{ include "emberburn.name" . }}
 {{- end }}
 
 {{/*

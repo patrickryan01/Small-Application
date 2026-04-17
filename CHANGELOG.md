@@ -5,6 +5,33 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-04-17 — Dashboard Alignment & Multi-Instance Support
+
+### ⚠️ BREAKING — Selector Label Change
+- **`app` label changed:** `{{ fullname }}` → `{{ .Chart.Name }}` in `_helpers.tpl`
+  - All instances now share `app: emberburn` for grouping
+  - `app.kubernetes.io/instance` distinguishes individual releases
+  - **Existing deployments must be deleted and reinstalled** (`helm uninstall` + `helm install`) — Kubernetes does not allow updating immutable `matchLabels` selectors in-place
+
+### Fixed
+- **Service names:** All services now use `{{ .Release.Name }}` as the base instead of `{{ fullname }}`
+  - WebUI service: `<release-name>` (was `<release-name>-emberburn`)
+  - OPC UA service: `<release-name>-opcua` (was `<release-name>-emberburn-opcua`)
+  - Prometheus service: `<release-name>-metrics` (was `<release-name>-emberburn-metrics`)
+  - **This fixes dashboard FQDN proxy routing** — the "OPEN" button now resolves correctly
+- **Ingress backend:** Updated to reference new webui service name
+- **Deployment strategy:** Added `strategy.type: Recreate` to prevent scheduling deadlock when using `hostNetwork: true` with a RWO PersistentVolumeClaim
+
+### Multi-Instance Deployment
+Multiple Emberburn instances can now be deployed simultaneously:
+```bash
+helm install emberburn-plant-a helm/opcua-server -n plant-a --create-namespace
+helm install emberburn-plant-b helm/opcua-server -n plant-b --create-namespace
+```
+Each instance gets unique services, PVCs, and ConfigMaps while sharing the `app: emberburn` identity label.
+
+---
+
 ## [Unreleased]
 
 ### Added

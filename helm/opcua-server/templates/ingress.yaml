@@ -34,7 +34,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "emberburn.fullname" $ }}
+                name: {{ $.Release.Name }}
                 port:
                   number: {{ $.Values.service.webui.port }}
           {{- end }}
