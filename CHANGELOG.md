@@ -5,6 +5,15 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.2] - 2026-04-21 — Documentation & Template Alignment
+
+### Fixed
+- **NOTES.txt:** Updated all service name references from `{{ fullname }}` to `{{ .Release.Name }}` to match the actual service templates (service-webui, service-opcua, service-prometheus)
+- **RELEASE_CHECKLIST.md:** Corrected stale `hostNetwork: true` guidance → `hostNetwork: false` (dashboard proxy requires ClusterIP networking)
+- **RELEASE_CHECKLIST.md:** Updated service naming description to reference `{{ .Release.Name }}` directly instead of fullname helper
+
+---
+
 ## [4.1.0] - 2026-04-17 — Dashboard Alignment & Multi-Instance Support
 
 ### ⚠️ BREAKING — Selector Label Change

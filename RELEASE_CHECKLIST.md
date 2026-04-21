@@ -72,7 +72,7 @@ Verify all four labels exist on **pod template** AND **Service (webui)** objects
 
 ### 4b. Network Configuration
 
-- [ ] `values.yaml` has `network.hostNetwork: true` (OT platform default)
+- [ ] `values.yaml` has `network.hostNetwork: false` (dashboard proxy requires ClusterIP networking)
 - [ ] `deployment.yaml` has `hostNetwork` / `dnsPolicy` conditional block
 
 ### 4c. `_helpers.tpl`
@@ -83,7 +83,7 @@ Verify all four labels exist on **pod template** AND **Service (webui)** objects
 
 ### 4d. Dashboard Integration
 
-- [ ] Service name uses fullname helper (resolves to release name)
+- [ ] Service name uses `{{ .Release.Name }}` directly (required for dashboard FQDN proxy routing)
 - [ ] Service selector matches pod selector labels
 - [ ] `gui-port` label value is a quoted number (`"5000"`)
 

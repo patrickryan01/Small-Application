@@ -6,19 +6,19 @@
     {{- end }}
   {{- end }}
 {{- else if contains "NodePort" .Values.service.webui.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "emberburn.fullname" . }})
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ .Release.Name }})
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo "EmberBurn Web UI: http://$NODE_IP:$NODE_PORT"
 {{- else if contains "LoadBalancer" .Values.service.webui.type }}
   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
         You can watch the status by running:
         
-        kubectl --namespace {{ .Release.Namespace }} get services -w {{ include "emberburn.fullname" . }}
+        kubectl --namespace {{ .Release.Namespace }} get services -w {{ .Release.Name }}
   
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "emberburn.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ .Release.Name }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo "EmberBurn Web UI: http://$SERVICE_IP:{{ .Values.service.webui.port }}"
 {{- else if contains "ClusterIP" .Values.service.webui.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
   echo "EmberBurn Web UI: http://127.0.0.1:5000"
   kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 5000:5000
 {{- end }}
