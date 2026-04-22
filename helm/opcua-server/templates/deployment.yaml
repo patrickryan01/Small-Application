@@ -24,7 +24,6 @@ spec:
       labels:
         {{- include "emberburn.selectorLabels" . | nindent 8 }}
         {{- include "emberburn.storeLabels" . | nindent 8 }}
-        embernet.ai/app-icon: {{ .Values.embernet.appIcon | default "fireball.png" | quote }}
         {{- if .Values.embernet.device }}
         embernet.ai/device: {{ .Values.embernet.device | quote }}
         {{- end }}

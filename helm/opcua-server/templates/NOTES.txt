@@ -25,11 +25,11 @@
 
 2. OPC UA Server Connection:
 
-   Endpoint: opc.tcp://{{ include "emberburn.fullname" . }}-opcua.{{ .Release.Namespace }}.svc.cluster.local:4840/freeopcua/server/
+   Endpoint: opc.tcp://{{ .Release.Name }}-opcua.{{ .Release.Namespace }}.svc.cluster.local:4840/freeopcua/server/
    
    {{- if eq .Values.service.opcua.type "LoadBalancer" }}
    External Endpoint (after LoadBalancer provisioned):
-   export OPCUA_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "emberburn.fullname" . }}-opcua --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+   export OPCUA_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ .Release.Name }}-opcua --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
    echo "OPC UA: opc.tcp://$OPCUA_IP:4840/freeopcua/server/"
    {{- end }}
 
@@ -98,24 +98,24 @@
 7. Common Operations:
 
    # Restart EmberBurn
-   kubectl rollout restart deployment/{{ include "emberburn.fullname" . }} -n {{ .Release.Namespace }}
+   kubectl rollout restart deployment/{{ .Release.Name }} -n {{ .Release.Namespace }}
    
    # Scale deployment
-   kubectl scale deployment/{{ include "emberburn.fullname" . }} --replicas=2 -n {{ .Release.Namespace }}
+   kubectl scale deployment/{{ .Release.Name }} --replicas=2 -n {{ .Release.Namespace }}
    
    # View configuration
    kubectl get configmap -n {{ .Release.Namespace }}
    
    # Access database (if persistence enabled)
    {{- if .Values.persistence.enabled }}
-   kubectl exec -it -n {{ .Release.Namespace }} deployment/{{ include "emberburn.fullname" . }} -- sqlite3 /app/data/emberburn.db
+   kubectl exec -it -n {{ .Release.Namespace }} deployment/{{ .Release.Name }} -- sqlite3 /app/data/emberburn.db
    {{- end }}
 
 8. Persistent Storage:
 {{- if .Values.persistence.enabled }}
    
    ✓ Persistent storage is ENABLED
-   PVC: {{ include "emberburn.pvcName" . }}
+   PVC: {{ .Release.Name }}-data
    Size: {{ .Values.persistence.size }}
    Mount: {{ .Values.persistence.mountPath }}
    
@@ -166,7 +166,7 @@
     kubectl describe pod -n {{ .Release.Namespace }} -l app=emberburn
     
     # PVC not binding?
-    kubectl describe pvc -n {{ .Release.Namespace }} {{ include "emberburn.pvcName" . }}
+    kubectl describe pvc -n {{ .Release.Namespace }} {{ .Release.Name }}-data
     
     # Check events
     kubectl get events -n {{ .Release.Namespace }} --sort-by=.lastTimestamp
@@ -174,7 +174,7 @@
     # Test OPC UA connection
     kubectl run -it --rm opcua-test --image=python:3.11-slim --restart=Never -- bash
     > pip install opcua
-    > python -c "from opcua import Client; c=Client('opc.tcp://{{ include "emberburn.fullname" . }}-opcua:4840/freeopcua/server/'); c.connect(); print('Connected!'); c.disconnect()"
+    > python -c "from opcua import Client; c=Client('opc.tcp://{{ .Release.Name }}-opcua:4840/freeopcua/server/'); c.connect(); print('Connected!'); c.disconnect()"
 
 12. Documentation:
    
