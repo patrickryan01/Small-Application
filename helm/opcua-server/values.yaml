@@ -330,12 +330,15 @@ flux:
   exposeMetrics: false
 
 # Embernet Dashboard integration
+# Per APP_STORE_DEPLOYMENT_FLOW.md: app-icon must be a full URL (rendered into
+# Service annotation `embernet.ai/app-icon`). Bare filenames will not resolve
+# from the dashboard origin.
 embernet:
-  appName: ""              # Defaults to .Chart.Name ("emberburn")
+  appName: ""              # Defaults to "EmberBurn" via storeLabels helper
   displayName: ""          # Annotation: "Plant Floor / EmberBurn Production"
-  guiType: "web"           # "web" | "shell" | "web+shell" | "none"
+  guiType: "web"           # Mirrors gui.type — kept for backward compat
   device: ""               # Digital twin device: "plc-conveyor-01"
-  appIcon: "fireball.png"  # Icon filename from static/images/
+  appIcon: ""              # Full URL; empty = use chart's default GitHub avatar
 
 # GUI configuration — canonical EmberNET template section
 # These values drive the storeLabels helper for dashboard discovery
@@ -359,11 +362,14 @@ tolerations: []
 # Affinity
 affinity: {}
 
-# Network configuration — OT platform default
-# hostNetwork: true is the default for factory floor environments
-# running Podman under K3s with direct network access requirements
+# Network configuration
+# Per AUDIT_HELM_CHARTS.md §5 (Multi-Instance Compatibility): hostNetwork=true
+# turns every containerPort into a host port and collides on second instance on
+# the same node, breaking the App Store multi-instance deployment model.
+# Per APP_STORE_DEPLOYMENT_FLOW.md: dashboard discovery uses ClusterIP FQDN
+# (`<release>.<ns>.svc.cluster.local:<port>`); hostNetwork bypasses that path.
 network:
-  hostNetwork: false       # DEFAULT FALSE — dashboard proxy requires ClusterIP networking
+  hostNetwork: false       # DEFAULT FALSE — dashboard proxy + multi-instance
   extraPorts: []
 
 # Pod Disruption Budget

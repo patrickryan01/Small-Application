@@ -1,4 +1,12 @@
-1. Get the EmberBurn Web UI URL by running these commands:
+1. Accessing the EmberBurn Web UI:
+
+   ▸ Embernet Dashboard (recommended): the dashboard discovers this release
+     via the `embernet.ai/store-app=true` label and proxies it through
+     `/api/proxy?target=http://{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.webui.port }}`.
+     Click the OPEN button on the node card — no URL, ingress, or DNS record
+     needed. (See APP_STORE_DEPLOYMENT_FLOW.md.)
+
+   ▸ Direct access (advanced):
 {{- if .Values.ingress.enabled }}
   {{- range $host := .Values.ingress.hosts }}
     {{- range .paths }}
@@ -145,20 +153,22 @@
 
 10. Embernet Dashboard Integration:
 
-    Store App:   true
-    GUI Type:    {{ .Values.embernet.guiType | default "web" }}
-    GUI Port:    {{ .Values.emberburn.ports.webui }}
-    App Name:    {{ .Values.embernet.appName | default .Chart.Name }}
-    App Icon:    {{ .Values.embernet.appIcon | default "fireball.png" }}
+    Store App:    true
+    GUI Type:     {{ .Values.gui.type | default "web" }}
+    GUI Port:     {{ .Values.gui.port | default .Values.service.webui.port }}
+    App Name:     {{ .Values.embernet.appName | default "EmberBurn" }}
+    App Icon:     {{ .Values.embernet.appIcon | default "https://avatars.githubusercontent.com/u/254966106?s=200&v=4" }}
   {{- if .Values.embernet.displayName }}
     Display Name: {{ .Values.embernet.displayName }}
   {{- end }}
   {{- if .Values.embernet.device }}
-    Device:      {{ .Values.embernet.device }}
+    Device:       {{ .Values.embernet.device }}
   {{- end }}
+    FQDN Target:  http://{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.webui.port }}
 
-    Your pod is labeled for automatic Embernet Dashboard discovery.
-    The dashboard "Open" button will proxy to port {{ .Values.emberburn.ports.webui }}.
+    Pod and Service carry the `embernet.ai/store-app=true` label; the dashboard
+    discovers the release and renders an OPEN button that proxies the iframe to
+    the FQDN above. No subdomain, no ingress, no hardcoded URL.
 
 11. Troubleshooting:
 

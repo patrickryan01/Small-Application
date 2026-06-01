@@ -12,13 +12,13 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   annotations:
-    embernet.ai/app-icon: "https://avatars.githubusercontent.com/u/254966106?s=200&v=4"
+    embernet.ai/app-icon: {{ .Values.embernet.appIcon | default "https://avatars.githubusercontent.com/u/254966106?s=200&v=4" | quote }}
     {{- if .Values.embernet.displayName }}
     embernet.ai/display-name: {{ .Values.embernet.displayName | quote }}
     {{- end }}
     {{- if .Values.flux.expose }}
     flux.embernet.ai/expose: "true"
-    flux.embernet.ai/service-name: {{ .Values.flux.serviceName | default .Chart.Name | quote }}
+    flux.embernet.ai/service-name: {{ .Values.flux.serviceName | default .Release.Name | quote }}
     flux.embernet.ai/port: {{ .Values.flux.port | default .Values.service.webui.port | quote }}
     flux.embernet.ai/role-attributes: {{ .Values.flux.roleAttributes | default "gui-services" | quote }}
     {{- end }}

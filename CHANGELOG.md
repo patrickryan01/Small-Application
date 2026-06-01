@@ -5,6 +5,51 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.8] - 2026-04-27 — App Store Deployment Flow Alignment
+
+Align the chart end-to-end with `APP_STORE_DEPLOYMENT_FLOW.md`. The chart was
+already mostly conformant (Service named `{{ .Release.Name }}`, the Big Four
+`embernet.ai/*` labels on pod template + Service, FQDN proxy pattern, no
+subdomain). This release closes the remaining gaps.
+
+### Fixed
+- **values.yaml:** `embernet.appIcon` default was a bare filename
+  (`fireball.png`), which produced an invalid `embernet.ai/app-icon` annotation
+  — the doc requires a full URL. Changed default to `""` so the
+  `service-webui.yaml` URL fallback (the GitHub avatar) is rendered.
+- **values.yaml:** `network.hostNetwork` default reverted to `false` per
+  `AUDIT_HELM_CHARTS.md` §5 (Multi-Instance Compatibility). `hostNetwork: true`
+  turns every containerPort into a host port and collides on the second
+  instance on the same node, breaking App Store multi-instance deployment.
+- **NOTES.txt §10:** Was reading `embernet.guiType` while `_helpers.tpl`
+  `storeLabels` reads `gui.type`/`gui.port`. Realigned NOTES.txt to read the
+  same values that drive the discovery labels.
+
+### Changed
+- **NOTES.txt §1:** Lead with the App Store proxy path
+  (`/api/proxy?target=http://{release}.{ns}.svc.cluster.local:{port}`) and
+  demote the ingress/NodePort/port-forward variants to "Direct access (advanced)".
+  Matches the doc's stance: App Store apps need no URL, ingress, or DNS record.
+- **NOTES.txt §10:** Now prints the full FQDN proxy target so operators can
+  verify the URL the dashboard's iframe will load.
+- **values.yaml:** Added comment clarifying that `embernet.guiType` is kept for
+  backward compat but `gui.type`/`gui.port` are the canonical inputs to the
+  store-discovery labels.
+
+## [4.1.7] - 2026-04-24 — App Store Deployment Alignment
+
+### Changed
+- **_helpers.tpl:** Standardized `app.kubernetes.io/name` to use chart name identity.
+- **_helpers.tpl:** Updated `embernet.ai/app-name` to use "EmberBurn" branding and made it configurable via `.Values.embernet.appName`.
+- **service-webui.yaml:** Made `embernet.ai/app-icon` annotation dynamic via `.Values.embernet.appIcon`.
+
+## [4.1.5] - 2026-04-24 — Dashboard Routing Fix
+
+### Fixed
+- **service-webui.yaml:** Updated `flux.embernet.ai/service-name` annotation to default to `{{ .Release.Name }}` instead of `{{ .Chart.Name }}`. This resolves the 404 "Service Not Found" error in EmberNET Dashboard V4.0.7 by ensuring the proxy URL targets the actual Kubernetes service name.
+
+---
+
 ## [4.1.2] - 2026-04-21 — Documentation & Template Alignment
 
 ### Fixed

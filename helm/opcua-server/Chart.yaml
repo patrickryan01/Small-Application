@@ -10,7 +10,7 @@ description: |
   persistence, and a beautiful Python Flask web UI for configuration and monitoring.
 
 type: application
-version: 4.1.3
+version: 4.1.8
 appVersion: "4.1.1"
 
 keywords:

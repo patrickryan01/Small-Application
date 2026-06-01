@@ -7,18 +7,10 @@ Expand the name of the chart.
 
 {{/*
 Create a default fully qualified app name.
+Forced to .Release.Name for stable FQDN-based proxy routing.
 */}}
 {{- define "emberburn.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
 {{- end }}
 
 {{/*
@@ -57,7 +49,7 @@ Required for dashboard discovery via embernet.ai/store-app=true selector.
 {{- define "emberburn.storeLabels" -}}
 embernet.ai/store-app: "true"
 embernet.ai/gui-type: {{ .Values.gui.type | default "web" | quote }}
-embernet.ai/app-name: {{ .Values.gui.displayName | default .Chart.Name | quote }}
+embernet.ai/app-name: {{ .Values.embernet.appName | default "EmberBurn" | quote }}
 embernet.ai/gui-port: {{ .Values.gui.port | default .Values.service.webui.port | default "5000" | quote }}
 {{- end }}
 
