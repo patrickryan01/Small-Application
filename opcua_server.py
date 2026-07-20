@@ -172,10 +172,98 @@ class OPCUAServer:
             self.logger.error(f"Error converting value {value} to {tag_type}: {e}")
             return value
     
+    def configure_security(self):
+        """
+        Apply the OPC UA security policy and user authentication.
+
+        Off by default and deliberately so: turning encryption or user auth on
+        makes every existing anonymous client fail to connect until it is
+        reconfigured with credentials and a trusted certificate. Operators opt
+        in per deployment via the Helm chart once their SCADA clients are ready.
+
+        Note this is entirely independent of the web UI on port 5000 — it does
+        not affect the Embernet Dashboard iframe, which speaks HTTP, not OPC UA.
+
+        Environment:
+            OPC_SECURITY_ENABLED  "true" to require signing and encryption
+            OPC_ALLOW_ANONYMOUS   "false" to reject anonymous sessions
+            OPC_USERS             "user1:pass1,user2:pass2"
+            OPC_CERT_FILE         server certificate (required when enabled)
+            OPC_KEY_FILE          server private key (required when enabled)
+        """
+        security_enabled = os.getenv('OPC_SECURITY_ENABLED', 'false').lower() == 'true'
+        allow_anonymous = os.getenv('OPC_ALLOW_ANONYMOUS', 'true').lower() == 'true'
+
+        if not security_enabled and allow_anonymous:
+            self.logger.warning(
+                "OPC UA endpoint is anonymous and unencrypted. Keep port 4840 on "
+                "a trusted network, or set OPC_SECURITY_ENABLED=true."
+            )
+            return
+
+        if security_enabled:
+            cert_file = os.getenv('OPC_CERT_FILE', '')
+            key_file = os.getenv('OPC_KEY_FILE', '')
+
+            if not cert_file or not key_file:
+                # Failing loudly beats silently serving plaintext when the
+                # operator believes they enabled encryption.
+                raise RuntimeError(
+                    "OPC_SECURITY_ENABLED=true requires OPC_CERT_FILE and "
+                    "OPC_KEY_FILE to be set"
+                )
+
+            try:
+                from opcua import ua
+                self.server.load_certificate(cert_file)
+                self.server.load_private_key(key_file)
+                self.server.set_security_policy([
+                    ua.SecurityPolicyType.Basic256Sha256_SignAndEncrypt,
+                    ua.SecurityPolicyType.Basic256Sha256_Sign,
+                ])
+                self.logger.info("OPC UA security policy: Basic256Sha256 (sign/encrypt)")
+            except Exception as e:
+                raise RuntimeError(f"Failed to configure OPC UA security: {e}") from e
+
+        if not allow_anonymous:
+            users = self._parse_users(os.getenv('OPC_USERS', ''))
+            if not users:
+                raise RuntimeError(
+                    "OPC_ALLOW_ANONYMOUS=false requires OPC_USERS "
+                    "(format: user1:pass1,user2:pass2)"
+                )
+
+            def user_manager(isession, username, password):
+                expected = users.get(username)
+                # compare_digest keeps this constant-time against guessing.
+                import hmac
+                return expected is not None and hmac.compare_digest(expected, password or '')
+
+            try:
+                self.server.user_manager.set_user_manager(user_manager)
+                self.logger.info(
+                    f"OPC UA user authentication enabled for {len(users)} user(s)"
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to configure OPC UA user manager: {e}") from e
+
+    @staticmethod
+    def _parse_users(raw: str) -> dict:
+        """Parse an OPC_USERS string of the form 'user1:pass1,user2:pass2'."""
+        users = {}
+        for entry in raw.split(','):
+            entry = entry.strip()
+            if not entry or ':' not in entry:
+                continue
+            username, password = entry.split(':', 1)
+            if username:
+                users[username] = password
+        return users
+
     def create_server(self):
         """
         Initialize and configure the OPC UA server.
-        
+
         Returns:
             int:  Namespace index
         """
@@ -187,7 +275,9 @@ class OPCUAServer:
         
         server_name = os.getenv('OPC_SERVER_NAME', 'Python OPC UA Server')
         self.server.set_server_name(server_name)
-        
+
+        self.configure_security()
+
         # Setup namespace
         uri = os.getenv('OPC_NAMESPACE', 'http://opcua.edge.server')
         idx = self.server.register_namespace(uri)
@@ -244,19 +334,27 @@ class OPCUAServer:
         self.logger.info(f"OPC UA Server configured with {len(self.tags)} tags")
         return idx
     
-    def write_tag(self, tag_name: str, value):
+    def write_tag(self, tag_name: str, value) -> bool:
         """
-        Write a value to a tag (used by transformation publisher).
-        
+        Write a value to a tag, creating it if it does not exist yet.
+
+        Used by the transformation publisher and by the REST API write/create
+        endpoints.
+
         Args:
             tag_name: Name of the tag to write
             value: Value to write
+
+        Returns:
+            True if the value was written (or the tag was created), False if the
+            write failed. Callers branch on this, so it must never return None.
         """
         try:
             if tag_name in self.tags:
                 var = self.tags[tag_name]["variable"]
                 var.set_value(value)
                 self.logger.debug(f"Wrote transformed tag {tag_name} = {value}")
+                return True
             else:
                 # Create new tag for transformed/computed values
                 if self.server:
@@ -284,9 +382,50 @@ class OPCUAServer:
                     }
                     
                     self.logger.info(f"Created new transformed tag: {tag_name} = {value}")
+                    return True
+
+                self.logger.error(
+                    f"Cannot write tag {tag_name}: OPC UA server not started"
+                )
+                return False
         except Exception as e:
             self.logger.error(f"Error writing tag {tag_name}: {e}")
-    
+            return False
+
+    def delete_tag(self, tag_name: str) -> bool:
+        """
+        Remove a tag from the OPC UA address space.
+
+        The REST DELETE endpoint used to clear only the publisher's tag_cache,
+        which the next update cycle repopulated from self.tags — so the tag
+        reappeared within one UPDATE_INTERVAL while the API reported success.
+        Deleting here is what actually makes it stick.
+
+        Args:
+            tag_name: Name of the tag to delete
+
+        Returns:
+            True if the tag was removed, False if it did not exist or the
+            removal failed.
+        """
+        if tag_name not in self.tags:
+            self.logger.warning(f"Cannot delete unknown tag: {tag_name}")
+            return False
+
+        try:
+            variable = self.tags[tag_name].get("variable")
+            if variable is not None:
+                variable.delete()
+        except Exception as e:
+            # Address-space removal failed, but we still drop our reference so
+            # the tag stops being published and simulated.
+            self.logger.error(f"Error removing OPC UA node for {tag_name}: {e}")
+
+        del self.tags[tag_name]
+        self.tag_metadata.pop(tag_name, None)
+        self.logger.info(f"Deleted tag: {tag_name}")
+        return True
+
     def update_tags(self):
         """Update tag values based on simulation configuration."""
         timestamp = time.time()
@@ -444,7 +583,7 @@ class OPCUAServer:
                 self._setup_tag_metadata()
                 
                 # Setup write callback for transformation publisher
-                self._setup_transformation_callback()
+                self._setup_write_callbacks()
                 
                 self.publisher_manager.start_all()
             
@@ -486,24 +625,37 @@ class OPCUAServer:
         if not self.publisher_manager:
             return
         
-        # Pass metadata to REST API publisher
+        # Every publisher gets metadata. DataPublisher declares tag_metadata, so
+        # there is nothing to probe for. This used to test for 'tag_cache' or
+        # 'tags_data' and silently skipped any publisher naming its store
+        # something else — GraphQL and Sparkplug B were both missed that way.
         for publisher in self.publisher_manager.publishers:
-            if hasattr(publisher, 'tag_cache'):
-                # This is likely the REST API or GraphQL publisher
-                publisher.tag_metadata = self.tag_metadata
-                self.logger.debug(f"Passed tag metadata to {publisher.__class__.__name__}")
+            publisher.tag_metadata = self.tag_metadata
+            self.logger.debug(f"Passed tag metadata to {publisher.__class__.__name__}")
     
-    def _setup_transformation_callback(self):
-        """Setup write callback for transformation publisher."""
+    def _setup_write_callbacks(self):
+        """
+        Give every publisher that accepts a write callback a way back into the
+        OPC UA address space.
+
+        This used to match only DataTransformationPublisher by class name, which
+        left RESTAPIPublisher.write_callback as None — so every write, create and
+        bulk-create from the web UI returned 501 "Write not supported". Any
+        publisher exposing set_write_callback needs the wiring, not just one.
+        """
         if not self.publisher_manager:
             return
-        
-        # Find transformation publisher and set write callback
+
         for publisher in self.publisher_manager.publishers:
-            if publisher.__class__.__name__ == 'DataTransformationPublisher':
-                publisher.set_write_callback(self.write_tag)
-                self.logger.info("Transformation publisher write callback configured")
-                break
+            if not hasattr(publisher, 'set_write_callback'):
+                continue
+            publisher.set_write_callback(self.write_tag)
+            self.logger.info(
+                f"Write callback configured for {publisher.__class__.__name__}"
+            )
+
+            if hasattr(publisher, 'set_delete_callback'):
+                publisher.set_delete_callback(self.delete_tag)
 
 
 def main():

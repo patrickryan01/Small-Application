@@ -43,9 +43,11 @@
 
 3. Enabled Protocols:
 
-   ✓ OPC UA Server - Port 4840
-   ✓ Web UI / REST API - Port 5000
-   ✓ Prometheus Metrics - Port 8000
+   ✓ OPC UA Server - Port {{ .Values.emberburn.ports.opcua }}
+   ✓ Web UI / REST API - Port {{ .Values.emberburn.ports.webui }}
+   {{- if .Values.config.publishers.prometheus.enabled }}
+   ✓ Prometheus Metrics - Port {{ .Values.emberburn.ports.prometheus }}
+   {{- end }}
    {{- if .Values.config.publishers.mqtt.enabled }}
    ✓ MQTT Publisher - {{ .Values.config.publishers.mqtt.broker }}:{{ .Values.config.publishers.mqtt.port }}
    {{- end }}
@@ -68,7 +70,7 @@
    kubectl get all -n {{ .Release.Namespace }}
    
    # View logs
-   kubectl logs -f -n {{ .Release.Namespace }} -l app=emberburn
+   kubectl logs -f -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
    
    # Check resource usage
    kubectl top pod -n {{ .Release.Namespace }}
@@ -106,24 +108,24 @@
 7. Common Operations:
 
    # Restart EmberBurn
-   kubectl rollout restart deployment/{{ .Release.Name }} -n {{ .Release.Namespace }}
-   
+   kubectl rollout restart deployment/{{ include "emberburn.fullname" . }} -n {{ .Release.Namespace }}
+
    # Scale deployment
-   kubectl scale deployment/{{ .Release.Name }} --replicas=2 -n {{ .Release.Namespace }}
+   kubectl scale deployment/{{ include "emberburn.fullname" . }} --replicas=2 -n {{ .Release.Namespace }}
    
    # View configuration
    kubectl get configmap -n {{ .Release.Namespace }}
    
    # Access database (if persistence enabled)
    {{- if .Values.persistence.enabled }}
-   kubectl exec -it -n {{ .Release.Namespace }} deployment/{{ .Release.Name }} -- sqlite3 /app/data/emberburn.db
+   kubectl exec -it -n {{ .Release.Namespace }} deployment/{{ include "emberburn.fullname" . }} -- sqlite3 /app/data/emberburn.db
    {{- end }}
 
 8. Persistent Storage:
 {{- if .Values.persistence.enabled }}
    
    ✓ Persistent storage is ENABLED
-   PVC: {{ .Release.Name }}-data
+   PVC: {{ include "emberburn.pvcName" . }}
    Size: {{ .Values.persistence.size }}
    Mount: {{ .Values.persistence.mountPath }}
    
@@ -173,10 +175,10 @@
 11. Troubleshooting:
 
     # Pod not starting?
-    kubectl describe pod -n {{ .Release.Namespace }} -l app=emberburn
+    kubectl describe pod -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "emberburn.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
     
     # PVC not binding?
-    kubectl describe pvc -n {{ .Release.Namespace }} {{ .Release.Name }}-data
+    kubectl describe pvc -n {{ .Release.Namespace }} {{ include "emberburn.pvcName" . }}
     
     # Check events
     kubectl get events -n {{ .Release.Namespace }} --sort-by=.lastTimestamp
@@ -188,9 +190,9 @@
 
 12. Documentation:
    
-    Helm Chart: https://github.com/fireball-industries/helm-charts
-    EmberBurn Docs: https://fireballindustries.com/emberburn
-    Support: https://fireballindustries.com/support
+    Helm Chart: https://github.com/Embernet-ai/helm-charts
+    EmberBurn Docs: https://fireballz.ai/emberburn
+    Support: https://fireballz.ai/support
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔥 Fireball Industries - We Play With Fire So You Don't Have To™

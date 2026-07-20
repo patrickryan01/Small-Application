@@ -8,7 +8,7 @@ let tagMetadata = {};
 async function updateTagsView() {
     try {
         // Get tag discovery data with metadata
-        const response = await fetch('/api/tags/discovery');
+        const response = await fetch(window.emberburnUrl('/api/tags/discovery'));
         const data = await response.json();
         tagMetadata = {};
         

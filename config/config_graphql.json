@@ -4,7 +4,7 @@
       "enabled": true,
       "host": "0.0.0.0",
       "port": 5002,
-      "graphiql": true,
+      "graphiql": false,
       "cors_enabled": true
     }
   }

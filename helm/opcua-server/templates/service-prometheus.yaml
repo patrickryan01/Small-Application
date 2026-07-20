@@ -10,6 +10,12 @@ metadata:
     {{- with .Values.service.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+    # Injected by the dashboard (store.go:1304-1315). A Service without
+    # embernet.ai/tenant is filtered out of every tenant-scoped view
+    # (services.go:226) — visible to SuperAdmin, invisible to the customer.
+    {{- with .Values.tenantLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   annotations:
     {{- if .Values.flux.exposeMetrics }}
     flux.embernet.ai/expose: "true"

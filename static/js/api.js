@@ -1,11 +1,49 @@
 // EmberBurn API Client
 // Handles all API communication with the backend
 
-// Use a relative path so fetch() resolves against the current page URL.
-// This is critical when EmberBurn is accessed via the Embernet Dashboard
-// iframe proxy (/api/proxy?target=...) — absolute paths like '/api' would
-// hit the dashboard host instead of routing back through the proxy.
-const API_BASE = 'api';
+// Resolve the URL prefix that reaches this pod.
+//
+// Two deployment modes must both work:
+//   1. Direct (ingress / port-forward / NodePort): the page is served at /tags,
+//      /config, etc. and the API lives at /api/... on the same origin.
+//   2. Embedded in the Embernet Dashboard, which proxies via a query parameter:
+//      /api/proxy?target=http://<podIP>:5000/<path>
+//
+// Mode 2 defeats both absolute and relative paths. An absolute '/api/tags' hits
+// the dashboard host directly; a relative 'api/tags' resolves against the
+// dashboard's own path (/api/proxy) and yields /api/api/tags. The only correct
+// answer is to rebuild the proxy prefix from the current query string.
+function emberburnBasePrefix() {
+    var match = window.location.search.match(/[?&]target=([^&]*)/);
+    if (!match) {
+        return '';  // Direct access — same-origin absolute paths are correct.
+    }
+    var target = decodeURIComponent(match[1]);
+    var origin = target.match(/^https?:\/\/[^/]+/);
+    if (!origin) {
+        return '';  // Malformed target; fall back to same-origin.
+    }
+    return window.location.pathname + '?target=' + origin[0];
+}
+
+// Exposed so page-level scripts build proxy-correct URLs instead of hardcoding
+// absolute paths (which silently break only when embedded in the dashboard).
+window.emberburnUrl = function (path) {
+    return emberburnBasePrefix() + path;
+};
+
+const API_BASE = window.emberburnUrl('/api');
+
+// The pod hands the UI its write token via a cookie on HTML responses, so the
+// dashboard iframe works with no login. When the deployment sets
+// EMBERBURN_UI_WRITES=false no cookie is issued and writes return 401 — the UI
+// is read-only by design in that posture.
+function emberburnWriteToken() {
+    var match = document.cookie.match(/(?:^|;\s*)emberburn_write_token=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 class EmberBurnAPI {
     constructor() {
@@ -14,8 +52,24 @@ class EmberBurnAPI {
 
     async fetchJSON(endpoint, options = {}) {
         try {
+            const method = (options.method || 'GET').toUpperCase();
+            if (MUTATING_METHODS.indexOf(method) !== -1) {
+                const token = emberburnWriteToken();
+                if (token) {
+                    options.headers = Object.assign({}, options.headers, {
+                        'X-EmberBurn-Token': token
+                    });
+                }
+            }
+
             const response = await fetch(`${this.baseURL}${endpoint}`, options);
             if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error(
+                        'This deployment is read-only from the web UI. ' +
+                        'Writes require the X-EmberBurn-Token header.'
+                    );
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return await response.json();
@@ -99,12 +153,10 @@ class EmberBurnAPI {
         return this.fetchJSON(`/tags/export?format=${format || 'json'}`);
     }
 
-    async importTags(formData) {
-        return this.fetchJSON('/tags/import', {
-            method: 'POST',
-            body: formData
-        });
-    }
+    // NOTE: there is deliberately no importTags() here. Import is parsed
+    // client-side in tag_generator.js (JSON and CSV) and submitted through
+    // bulkCreateTags() -> POST /api/tags/bulk. A previous importTags() posted to
+    // /api/tags/import, which has never existed server-side and always 404'd.
 }
 
 // Create global API instance

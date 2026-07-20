@@ -10,17 +10,20 @@ License: MIT
 import json
 import logging
 import os
+import secrets
 import threading
 import time
 import requests  # For HTTP requests (Slack webhooks, etc.)
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Tuple
 import paho.mqtt.client as mqtt
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from version import __version__
+
 try:
-    from sparkplug_b import *
+    import pysparkplug as sparkplug
     SPARKPLUG_AVAILABLE = True
 except ImportError:
     SPARKPLUG_AVAILABLE = False
@@ -61,7 +64,6 @@ except ImportError:
 
 try:
     import graphene
-    from flask_graphql import GraphQLView
     GRAPHQL_AVAILABLE = True
 except ImportError:
     GRAPHQL_AVAILABLE = False
@@ -87,7 +89,7 @@ except ImportError:
     TWILIO_AVAILABLE = False
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, Info, generate_latest, REGISTRY, CollectorRegistry
+    from prometheus_client import Counter, Gauge, Histogram, Info, generate_latest, REGISTRY
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -114,7 +116,14 @@ class DataPublisher(ABC):
         self.enabled = config.get("enabled", False)
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.running = False
-        
+
+        # Populated by OPCUAServer._setup_tag_metadata() before start_all().
+        # Declared here so every publisher can rely on it existing: the server
+        # used to discover targets by probing for 'tag_cache' or 'tags_data',
+        # which silently skipped any publisher that happened to name its store
+        # something else. GraphQL and Sparkplug B were both missed that way.
+        self.tag_metadata: Dict[str, Any] = {}
+
     @abstractmethod
     def start(self):
         """Start the publisher."""
@@ -272,19 +281,108 @@ class MQTTPublisher(DataPublisher):
         self.command_callback = callback
 
 
+_SECRET_KEY_MARKERS = ('password', 'token', 'secret', 'webhook_url', 'api_key', 'apikey')
+
+
+def _redact_secrets(value):
+    """
+    Recursively replace credential-bearing values with a placeholder.
+
+    Used before returning configuration over the unauthenticated REST API so a
+    config export cannot leak broker passwords, InfluxDB tokens or Slack
+    webhooks.
+    """
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if any(marker in key.lower() for marker in _SECRET_KEY_MARKERS) and item:
+                redacted[key] = '***REDACTED***'
+            else:
+                redacted[key] = _redact_secrets(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_secrets(item) for item in value]
+    return value
+
+
+class RingBufferLogHandler(logging.Handler):
+    """
+    Keeps the most recent log records in memory so the web UI can show them.
+
+    EmberBurn logs to stdout only (see opcua_server.py), which is right for
+    Kubernetes but means there is no file for the UI to read. This handler is
+    what backs GET /api/logs.
+    """
+
+    def __init__(self, capacity: int = 500):
+        super().__init__()
+        self.records = deque(maxlen=capacity)
+
+    def emit(self, record):
+        try:
+            self.records.append({
+                "timestamp": record.created,
+                "level": record.levelname,
+                "logger": record.name,
+                "message": self.format(record),
+            })
+        except Exception:
+            # A logging handler must never raise into application code.
+            self.handleError(record)
+
+
 class RESTAPIPublisher(DataPublisher):
     """REST API Publisher for tag data."""
-    
+
+    # Methods that change server state and therefore require a token.
+    _MUTATING_METHODS = frozenset({'POST', 'PUT', 'PATCH', 'DELETE'})
+
+    # Header clients present the token in. Deliberately not 'Authorization':
+    # there is no user identity here, only a shared deployment secret.
+    _TOKEN_HEADER = 'X-EmberBurn-Token'
+
     def __init__(self, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
         super().__init__(config, logger)
-        self.app = Flask(__name__, 
+        self.app = Flask(__name__,
                         template_folder='templates',
                         static_folder='static')
-        CORS(self.app)
+
+        # CORS was previously wide open to every origin. Default to same-origin
+        # (which is what the dashboard proxy needs) and let operators widen it.
+        cors_origins = [
+            origin.strip()
+            for origin in os.getenv('EMBERBURN_CORS_ORIGINS', '').split(',')
+            if origin.strip()
+        ]
+        if cors_origins:
+            CORS(self.app, origins=cors_origins)
+            self.logger.info(f"CORS restricted to: {', '.join(cors_origins)}")
+        else:
+            CORS(self.app, origins=[])
+
+        self._setup_write_auth()
+
         self.server_thread = None
         self.tag_cache = {}
         self.write_callback = None
-        
+        self.delete_callback = None
+
+        # Full gateway config, populated by PublisherManager. Distinct from
+        # self.config, which holds only this publisher's own settings.
+        self.runtime_config = None
+
+        # Capture recent log output for the Config page's log viewer. Drop any
+        # handler left by a previous instance so repeated construction (tests,
+        # reconfiguration) does not stack duplicates on the root logger.
+        root_logger = logging.getLogger()
+        for handler in list(root_logger.handlers):
+            if isinstance(handler, RingBufferLogHandler):
+                root_logger.removeHandler(handler)
+
+        self.log_buffer = RingBufferLogHandler()
+        self.log_buffer.setFormatter(logging.Formatter('%(message)s'))
+        root_logger.addHandler(self.log_buffer)
+
         # Register Web UI Blueprint
         try:
             from web_app import web_ui
@@ -327,20 +425,32 @@ class RESTAPIPublisher(DataPublisher):
     def setup_routes(self):
         """Setup Flask API routes."""
         
+        @self.app.route('/api', methods=['GET'])
         @self.app.route('/', methods=['GET'])
         def index_redirect():
-            """Redirect root to dashboard (handled by Blueprint)."""
-            # If web_ui blueprint is registered, Flask will handle the route
-            # Otherwise, return API info
+            """
+            API index.
+
+            Also registered at '/' as a fallback: when the web_ui blueprint is
+            available it owns '/' and serves the dashboard, so this only answers
+            there in API-only deployments. '/api' is the stable address for
+            clients — the UI's Config page reads it for endpoint discovery.
+            """
+            # GraphQL runs on its own port, so it needs an absolute URL — but
+            # build it from the requesting host, not "localhost", which is only
+            # ever correct for a client running inside the container.
+            graphql_host = request.host.split(':')[0]
+            graphql_port = self.config.get("graphql_port", 5002)
+
             return jsonify({
                 "message": "EmberBurn OPC UA Gateway API",
-                "version": "1.0",
+                "version": __version__,
                 "endpoints": {
                     "ui": "/",
                     "tags": "/api/tags",
                     "publishers": "/api/publishers",
                     "alarms": "/api/alarms/active",
-                    "graphql": "http://localhost:5002/graphql"
+                    "graphql": f"http://{graphql_host}:{graphql_port}/graphql"
                 }
             })
         
@@ -488,12 +598,37 @@ class RESTAPIPublisher(DataPublisher):
                 "tags_count": len(self.tag_cache)
             })
         
+        @self.app.route('/api/logs', methods=['GET'])
+        def get_logs():
+            """Return the most recent log records held in memory."""
+            try:
+                limit = min(int(request.args.get('limit', 200)), 500)
+            except (TypeError, ValueError):
+                limit = 200
+
+            records = list(self.log_buffer.records)[-limit:]
+            return jsonify({"logs": records, "count": len(records)})
+
+        @self.app.route('/api/config', methods=['GET'])
+        def get_config():
+            """
+            Return the running publisher configuration.
+
+            Credential-bearing fields are redacted — this endpoint is
+            unauthenticated, like the rest of the API.
+            """
+            return jsonify(_redact_secrets(self.runtime_config or {}))
+
         @self.app.route('/api/publishers', methods=['GET'])
         def get_publishers():
             """Get all publisher statuses."""
-            # This will be populated by the PublisherManager
+            # Query the manager on every request. This used to read a list
+            # snapshotted once during start_all(), so toggling a publisher never
+            # changed the ENABLED/DISABLED badge no matter how often the UI
+            # re-polled.
+            callback = getattr(self, '_statuses_callback', None)
             return jsonify({
-                "publishers": getattr(self, '_publisher_statuses', [])
+                "publishers": callback() if callback else []
             })
         
         @self.app.route('/api/publishers/<publisher_name>/toggle', methods=['POST'])
@@ -592,12 +727,21 @@ class RESTAPIPublisher(DataPublisher):
 
         @self.app.route('/api/tags/<tag_name>', methods=['DELETE'])
         def delete_tag(tag_name):
-            """Delete a tag (remove from cache and metadata)."""
+            """Delete a tag from the OPC UA address space and local caches."""
             try:
-                if tag_name in self.tag_cache:
-                    del self.tag_cache[tag_name]
-                if hasattr(self, 'tag_metadata') and tag_name in self.tag_metadata:
-                    del self.tag_metadata[tag_name]
+                if not self.delete_callback:
+                    return jsonify({"error": "Delete not supported"}), 501
+
+                # Remove from the address space first. Clearing only the local
+                # caches is not enough — publish() repopulates tag_cache on the
+                # next update cycle and the tag comes straight back.
+                if not self.delete_callback(tag_name):
+                    return jsonify({"error": "Tag not found"}), 404
+
+                self.tag_cache.pop(tag_name, None)
+                if hasattr(self, 'tag_metadata'):
+                    self.tag_metadata.pop(tag_name, None)
+
                 return jsonify({"success": True, "deleted": tag_name})
             except Exception as e:
                 self.logger.error(f"Error deleting tag: {e}")
@@ -762,108 +906,235 @@ class RESTAPIPublisher(DataPublisher):
             "timestamp": timestamp or time.time()
         }
     
+    def _setup_write_auth(self):
+        """
+        Require a shared token on state-changing REST calls.
+
+        Reads stay open because the Embernet Dashboard polls them continuously
+        and there is no user session to authenticate against. Writes are gated.
+
+        The UI is served by this same pod, so when EMBERBURN_UI_WRITES is true
+        the token is injected into the page (see inject_ui_token) and the
+        dashboard iframe keeps working with no login prompt. That necessarily
+        means anyone who can load the page can also write — set
+        EMBERBURN_UI_WRITES=false for an internet-reachable deployment, which
+        makes the UI read-only while automation holding the token still works.
+        """
+        configured_key = os.getenv('EMBERBURN_API_KEY', '').strip()
+        if configured_key:
+            self.api_key = configured_key
+        else:
+            # Secure-by-default: without a configured key we still refuse
+            # anonymous writes, using a per-pod random token. Writes then work
+            # from the UI (which receives it) but not from external callers,
+            # who need an explicitly configured key.
+            self.api_key = secrets.token_urlsafe(32)
+            self.logger.warning(
+                "No EMBERBURN_API_KEY set — generated an ephemeral write token. "
+                "External clients cannot write until you configure one."
+            )
+
+        self.ui_writes_enabled = os.getenv('EMBERBURN_UI_WRITES', 'true').lower() == 'true'
+        if not self.ui_writes_enabled:
+            self.logger.info("UI writes disabled — web UI is read-only")
+
+        @self.app.before_request
+        def require_write_token():
+            if request.method not in self._MUTATING_METHODS:
+                return None
+            if not request.path.startswith('/api/'):
+                return None
+
+            presented = request.headers.get(self._TOKEN_HEADER, '')
+            if presented and secrets.compare_digest(presented, self.api_key):
+                return None
+
+            self.logger.warning(
+                f"Rejected unauthenticated {request.method} {request.path} "
+                f"from {request.remote_addr}"
+            )
+            return jsonify({
+                "error": "Unauthorized",
+                "detail": f"Write requests require the {self._TOKEN_HEADER} header."
+            }), 401
+
+        @self.app.after_request
+        def inject_ui_token(response):
+            """
+            Hand the write token to the UI it is served alongside.
+
+            Only on HTML responses, and only when UI writes are enabled — with
+            EMBERBURN_UI_WRITES=false the page never receives a token and the
+            UI degrades to read-only on its own.
+            """
+            if not self.ui_writes_enabled:
+                return response
+            if not response.content_type or 'text/html' not in response.content_type:
+                return response
+
+            response.set_cookie(
+                'emberburn_write_token',
+                self.api_key,
+                httponly=False,   # config.js reads this to set the header
+                samesite='Lax',
+                secure=request.is_secure,
+            )
+            return response
+
     def set_write_callback(self, callback):
         """Set callback function for handling write requests."""
         self.write_callback = callback
 
+    def set_delete_callback(self, callback):
+        """Set callback used to remove a tag from the OPC UA address space."""
+        self.delete_callback = callback
+
 
 class SparkplugBPublisher(DataPublisher):
-    """Sparkplug B Publisher for Ignition Edge and SCADA systems."""
-    
+    """
+    Sparkplug B Publisher for Ignition Edge and SCADA systems.
+
+    Built on pysparkplug, which owns the protobuf encoding and the birth/death
+    state machine — NBIRTH, DBIRTH, NDEATH, bdSeq and sequence numbering. Those
+    are the parts of the spec that are easy to get subtly wrong, so they are
+    deliberately not reimplemented here.
+
+    Sparkplug requires every metric in a DDATA to have been declared in the
+    preceding DBIRTH. EmberBurn discovers tags at runtime — the Tag Generator can
+    create them after startup — so this publisher seeds its metric set from tag
+    metadata at start() and re-births the device if a tag it has never seen shows
+    up later. Rebirth is the spec's own mechanism for introducing new metrics.
+    """
+
+    # Sparkplug datatype for a declared tag type. Ints map to INT64 rather than
+    # INT32 because OPC UA counters here are unbounded and would silently wrap.
+    _DECLARED_TYPE_MAP = {
+        "bool": "BOOLEAN",
+        "int": "INT64",
+        "float": "DOUBLE",
+        "string": "STRING",
+    }
+
     def __init__(self, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
         super().__init__(config, logger)
         if not SPARKPLUG_AVAILABLE:
-            self.logger.warning("Sparkplug B library not available. Install with: pip install sparkplug-b")
+            self.logger.warning(
+                "Sparkplug B library not available. Install with: pip install pysparkplug"
+            )
             self.enabled = False
             return
-            
-        self.client = None
+
+        self.group_id = config.get("group_id", "Sparkplug B Devices")
+        self.edge_node_id = config.get("edge_node_id", "OPC_UA_Gateway")
+        self.device_id = config.get("device_id", "EdgeDevice")
+
+        self.edge_node = None
         self.connected = False
-        self.sequence_number = 0
-        self.bdSeq = 0
-        
-    def get_next_sequence(self):
-        """Get next sequence number (0-255)."""
-        seq = self.sequence_number
-        self.sequence_number = (self.sequence_number + 1) % 256
-        return seq
-    
-    def on_connect(self, client, userdata, flags, rc):
-        """Callback for when the client receives a CONNACK response."""
-        if rc == 0:
-            self.connected = True
-            self.logger.info("Connected to Sparkplug B broker successfully")
-            
-            # Send NBIRTH (Node Birth) message
-            self.send_node_birth()
-            # Send DBIRTH (Device Birth) message
-            self.send_device_birth()
-        else:
-            self.logger.error(f"Failed to connect to Sparkplug B broker, return code {rc}")
-            self.connected = False
-    
-    def on_disconnect(self, client, userdata, rc):
-        """Callback for when the client disconnects."""
-        self.connected = False
-        if rc != 0:
-            self.logger.warning(f"Unexpected Sparkplug B disconnection (rc={rc})")
-    
-    def send_node_birth(self):
-        """Send Node Birth Certificate."""
-        if not self.connected:
-            return
-            
-        try:
-            group_id = self.config.get("group_id", "Sparkplug B Devices")
-            edge_node_id = self.config.get("edge_node_id", "OPC_UA_Gateway")
-            
-            topic = f"spBv1.0/{group_id}/NBIRTH/{edge_node_id}"
-            
-            # Create minimal NBIRTH payload
-            payload = {
-                "timestamp": int(time.time() * 1000),
-                "metrics": [
-                    {
-                        "name": "Node Control/Rebirth",
-                        "timestamp": int(time.time() * 1000),
-                        "dataType": "Boolean",
-                        "value": False
-                    }
-                ],
-                "seq": self.get_next_sequence()
-            }
-            
-            self.client.publish(topic, json.dumps(payload), qos=0, retain=False)
-            self.logger.info(f"Sent NBIRTH to {topic}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending NBIRTH: {e}")
-    
-    def send_device_birth(self):
-        """Send Device Birth Certificate with all metrics."""
-        if not self.connected:
-            return
-            
-        try:
-            group_id = self.config.get("group_id", "Sparkplug B Devices")
-            edge_node_id = self.config.get("edge_node_id", "OPC_UA_Gateway")
-            device_id = self.config.get("device_id", "EdgeDevice")
-            
-            topic = f"spBv1.0/{group_id}/DBIRTH/{edge_node_id}/{device_id}"
-            
-            # Create DBIRTH payload with metrics
-            payload = {
-                "timestamp": int(time.time() * 1000),
-                "metrics": [],
-                "seq": self.get_next_sequence()
-            }
-            
-            self.client.publish(topic, json.dumps(payload), qos=0, retain=False)
-            self.logger.info(f"Sent DBIRTH to {topic}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending DBIRTH: {e}")
-    
+
+        # Tag names already declared in a DBIRTH. A tag outside this set forces a
+        # rebirth before its first DDATA.
+        self._declared_tags = set()
+        self._lock = threading.Lock()
+
+    def _datatype_for(self, tag_name: str, value: Any):
+        """
+        Resolve the Sparkplug datatype for a tag.
+
+        Prefers the declared OPC UA type from tag metadata so a float tag that
+        happens to hold a whole number is not published as an integer. Falls back
+        to the Python type of the value.
+        """
+        declared = (self.tag_metadata.get(tag_name) or {}).get("type")
+        name = self._DECLARED_TYPE_MAP.get(declared)
+
+        if name is None:
+            if isinstance(value, bool):
+                name = "BOOLEAN"
+            elif isinstance(value, int):
+                name = "INT64"
+            elif isinstance(value, float):
+                name = "DOUBLE"
+            else:
+                name = "STRING"
+
+        return getattr(sparkplug.DataType, name)
+
+    def _coerce(self, value: Any, datatype) -> Any:
+        """Coerce a value to match the datatype being declared for it."""
+        if datatype == sparkplug.DataType.BOOLEAN:
+            return bool(value)
+        if datatype == sparkplug.DataType.INT64:
+            return int(value)
+        if datatype == sparkplug.DataType.DOUBLE:
+            return float(value)
+        return str(value)
+
+    def _metric(self, tag_name: str, value: Any, timestamp: Optional[float] = None):
+        """Build a Sparkplug metric for a tag."""
+        datatype = self._datatype_for(tag_name, value)
+        return sparkplug.Metric(
+            timestamp=int((timestamp or time.time()) * 1000),
+            name=tag_name,
+            datatype=datatype,
+            value=self._coerce(value, datatype),
+        )
+
+    def _seed_metrics(self):
+        """
+        Build the initial metric set for the DBIRTH from tag metadata.
+
+        The server attaches tag_metadata before start_all(), so in practice every
+        configured tag is declared in the first DBIRTH and no rebirth is needed
+        during normal startup.
+        """
+        metrics = []
+        for tag_name, meta in (self.tag_metadata or {}).items():
+            declared = (meta or {}).get("type", "float")
+            datatype = getattr(
+                sparkplug.DataType,
+                self._DECLARED_TYPE_MAP.get(declared, "STRING"),
+            )
+            metrics.append(
+                sparkplug.Metric(
+                    timestamp=int(time.time() * 1000),
+                    name=tag_name,
+                    datatype=datatype,
+                    value=self._coerce(0, datatype),
+                )
+            )
+            self._declared_tags.add(tag_name)
+        return metrics
+
+    def _rebirth(self, metrics):
+        """
+        Register the device, declaring `metrics` in a DBIRTH.
+
+        A device id can only be registered once per edge node, so a rebirth means
+        deregistering first. Deregistering also emits DDEATH, which is correct:
+        consumers must discard the old metric set before the new DBIRTH arrives.
+        """
+        if self.device_id in self.edge_node.devices:
+            self.edge_node.deregister(self.device_id)
+
+        device = sparkplug.Device(device_id=self.device_id, metrics=metrics)
+        self.edge_node.register(device)
+
+    def _await_connection(self, timeout: float = 10.0) -> bool:
+        """
+        Block until the MQTT connection is actually established.
+
+        connect() is non-blocking — it hands off to a background thread and
+        returns immediately, so publishing straight afterwards fails with "the
+        client is not currently connected". pysparkplug exposes no public
+        readiness signal or on-connect hook, so poll its internal flag.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if getattr(self.edge_node, '_connected', False):
+                return True
+            time.sleep(0.1)
+        return False
+
     def start(self):
         """Start the Sparkplug B publisher."""
         if not self.enabled or not SPARKPLUG_AVAILABLE:
@@ -872,68 +1143,73 @@ class SparkplugBPublisher(DataPublisher):
             else:
                 self.logger.info("Sparkplug B publisher is disabled")
             return
-        
+
         try:
             broker = self.config.get("broker", "localhost")
             port = self.config.get("port", 1883)
-            group_id = self.config.get("group_id", "Sparkplug B Devices")
-            edge_node_id = self.config.get("edge_node_id", "OPC_UA_Gateway")
-            
-            client_id = f"{group_id}_{edge_node_id}"
-            
-            self.client = mqtt.Client(client_id=client_id)
-            self.client.on_connect = self.on_connect
-            self.client.on_disconnect = self.on_disconnect
-            
-            # Set username/password if provided
-            username = self.config.get("username")
-            password = self.config.get("password")
-            if username and password:
-                self.client.username_pw_set(username, password)
-            
-            # Configure NDEATH (Node Death) certificate as LWT
-            ndeath_topic = f"spBv1.0/{group_id}/NDEATH/{edge_node_id}"
-            ndeath_payload = {
-                "timestamp": int(time.time() * 1000),
-                "bdSeq": self.bdSeq
-            }
-            self.client.will_set(ndeath_topic, json.dumps(ndeath_payload), qos=0, retain=False)
-            
+            username = self.config.get("username") or None
+            password = self.config.get("password") or None
+
+            client = sparkplug.Client(
+                client_id=f"{self.group_id}_{self.edge_node_id}",
+                username=username,
+                password=password,
+            )
+
+            metrics = self._seed_metrics()
+
+            # EdgeNode owns the NBIRTH/NDEATH certificates and the MQTT will.
+            self.edge_node = sparkplug.EdgeNode(
+                group_id=self.group_id,
+                edge_node_id=self.edge_node_id,
+                metrics=metrics,
+                client=client,
+            )
+
             self.logger.info(f"Connecting to Sparkplug B broker at {broker}:{port}")
-            self.client.connect(broker, port, keepalive=60)
-            self.client.loop_start()
+            self.edge_node.connect(broker, port=port, keepalive=60)
+
+            if not self._await_connection():
+                self.logger.error(
+                    f"Timed out connecting to Sparkplug B broker at {broker}:{port}"
+                )
+                self.connected = False
+                self.running = False
+                return
+
+            # DBIRTH declares the metric set this device will publish.
+            self._rebirth(metrics)
+
+            self.connected = True
             self.running = True
-            
+            self.logger.info(
+                f"Sparkplug B publisher started — {self.group_id}/{self.edge_node_id}/"
+                f"{self.device_id}, {len(metrics)} metric(s) declared"
+            )
+
         except Exception as e:
             self.logger.error(f"Failed to start Sparkplug B publisher: {e}")
+            self.connected = False
             self.running = False
-    
+
     def stop(self):
-        """Stop the Sparkplug B publisher."""
-        if self.client and self.running:
-            # Send NDEATH before disconnecting
-            try:
-                group_id = self.config.get("group_id", "Sparkplug B Devices")
-                edge_node_id = self.config.get("edge_node_id", "OPC_UA_Gateway")
-                
-                topic = f"spBv1.0/{group_id}/NDEATH/{edge_node_id}"
-                payload = {
-                    "timestamp": int(time.time() * 1000),
-                    "bdSeq": self.bdSeq
-                }
-                self.client.publish(topic, json.dumps(payload), qos=0, retain=False)
-            except:
-                pass
-                
-            self.client.loop_stop()
-            self.client.disconnect()
-            self.running = False
+        """Stop the Sparkplug B publisher, emitting NDEATH."""
+        if not self.edge_node or not self.running:
+            return
+
+        try:
+            self.edge_node.disconnect()
             self.logger.info("Sparkplug B publisher stopped")
-    
+        except Exception as e:
+            self.logger.warning(f"Error during Sparkplug B disconnect: {e}")
+        finally:
+            self.connected = False
+            self.running = False
+
     def publish(self, tag_name: str, value: Any, timestamp: Optional[float] = None):
         """
-        Publish tag value using Sparkplug B DDATA message.
-        
+        Publish a tag value as a Sparkplug B DDATA message.
+
         Args:
             tag_name: Name of the tag
             value: Tag value
@@ -941,47 +1217,29 @@ class SparkplugBPublisher(DataPublisher):
         """
         if not self.enabled or not self.connected or not SPARKPLUG_AVAILABLE:
             return
-        
+
         try:
-            group_id = self.config.get("group_id", "Sparkplug B Devices")
-            edge_node_id = self.config.get("edge_node_id", "OPC_UA_Gateway")
-            device_id = self.config.get("device_id", "EdgeDevice")
-            
-            topic = f"spBv1.0/{group_id}/DDATA/{edge_node_id}/{device_id}"
-            
-            # Determine Sparkplug data type
-            if isinstance(value, bool):
-                datatype = "Boolean"
-            elif isinstance(value, int):
-                datatype = "Int32"
-            elif isinstance(value, float):
-                datatype = "Float"
-            elif isinstance(value, str):
-                datatype = "String"
-            else:
-                datatype = "String"
-                value = str(value)
-            
-            # Create DDATA payload
-            payload = {
-                "timestamp": int((timestamp or time.time()) * 1000),
-                "metrics": [
-                    {
-                        "name": tag_name,
-                        "timestamp": int((timestamp or time.time()) * 1000),
-                        "dataType": datatype,
-                        "value": value
-                    }
-                ],
-                "seq": self.get_next_sequence()
-            }
-            
-            self.client.publish(topic, json.dumps(payload), qos=0, retain=False)
+            metric = self._metric(tag_name, value, timestamp)
+
+            with self._lock:
+                is_new = tag_name not in self._declared_tags
+                if is_new:
+                    self._declared_tags.add(tag_name)
+
+            if is_new:
+                # A metric that was never declared cannot legally appear in DDATA.
+                # Rebirth with the full known set so consumers stay in sync.
+                self.logger.info(f"New tag {tag_name} — re-birthing Sparkplug device")
+                self._rebirth([
+                    self._metric(name, value if name == tag_name else 0, timestamp)
+                    for name in sorted(self._declared_tags)
+                ])
+
+            self.edge_node.update_device(self.device_id, [metric])
             self.logger.debug(f"Published Sparkplug B DDATA: {tag_name} = {value}")
-            
+
         except Exception as e:
             self.logger.error(f"Error publishing to Sparkplug B: {e}")
-
 
 class KafkaPublisher(DataPublisher):
     """Apache Kafka Publisher for enterprise streaming."""
@@ -1126,8 +1384,8 @@ class AMQPPublisher(DataPublisher):
             try:
                 self.channel.close()
                 self.connection.close()
-            except:
-                pass
+            except Exception as e:
+                self.logger.warning(f"Error closing AMQP connection: {e}")
             self.running = False
             self.logger.info("AMQP publisher stopped")
     
@@ -1261,7 +1519,7 @@ class WebSocketPublisher(DataPublisher):
             for client in self.clients[:]:  # Use copy to avoid modification during iteration
                 try:
                     self.server.send_message(client, message_json)
-                except:
+                except Exception:
                     # Remove disconnected clients
                     if client in self.clients:
                         self.clients.remove(client)
@@ -2081,48 +2339,51 @@ class GraphQLPublisher(DataPublisher):
             "enabled": true,
             "host": "0.0.0.0",
             "port": 5002,
-            "graphiql": true,  // Enable GraphiQL web interface
+            "graphiql": false, // GraphiQL IDE — needs internet, see below
             "cors_enabled": true
         }
         """
         super().__init__(config, logger)
         
         if not GRAPHQL_AVAILABLE:
-            self.logger.warning("GraphQL libraries not available. Install with: pip install graphene flask-graphql")
+            self.logger.warning("GraphQL libraries not available. Install with: pip install graphene")
             self.enabled = False
             return
-        
+
         self.app = Flask(__name__)
         if config.get("cors_enabled", True):
             CORS(self.app)
-        
+
         self.tags_data = {}  # In-memory tag storage
         self.server_thread = None
-        
+
         # Build GraphQL schema
         self._setup_schema()
-        
+
         # Add GraphQL endpoint
         host = config.get("host", "0.0.0.0")
         port = config.get("port", 5002)
-        graphiql = config.get("graphiql", True)
-        
-        self.app.add_url_rule(
-            '/graphql',
-            view_func=GraphQLView.as_view(
-                'graphql',
-                schema=self.schema,
-                graphiql=graphiql  # Enable GraphiQL IDE
-            )
-        )
-        
+        # Defaults off: the IDE loads React and GraphiQL from a public CDN, which
+        # is unreachable in the air-gapped clusters EmberBurn ships into. The
+        # GraphQL API itself has no external dependency — only the IDE does.
+        graphiql = config.get("graphiql", False)
+
+        self._setup_routes(graphiql)
+
         self.logger.info(f"GraphQL publisher initialized on http://{host}:{port}/graphql")
         if graphiql:
             self.logger.info(f"GraphiQL IDE available at http://{host}:{port}/graphql")
     
     def _setup_schema(self):
         """Setup GraphQL schema with types and queries."""
-        
+
+        # Resolvers close over the publisher rather than reading class attributes
+        # off Query: graphene hands the resolver the *root value* (None for
+        # top-level queries), so `self.tags_data` inside a resolver would never
+        # find the data. The closure also picks up tag_metadata, which the server
+        # attaches to the publisher after __init__ has already run.
+        publisher = self
+
         # Define Tag type
         class TagType(graphene.ObjectType):
             name = graphene.String(description="Tag name")
@@ -2149,7 +2410,25 @@ class GraphQLPublisher(DataPublisher):
         class TagStatsType(graphene.ObjectType):
             count = graphene.Int(description="Total number of tags")
             tags = graphene.List(graphene.String, description="List of tag names")
-        
+
+        def build_tag(name, tag_data):
+            """Assemble a TagType from stored tag data plus any known metadata."""
+            metadata = getattr(publisher, 'tag_metadata', {}).get(name, {})
+            return TagType(
+                name=name,
+                value=tag_data.get('value'),
+                type=metadata.get('type', tag_data.get('type', 'unknown')),
+                timestamp=tag_data.get('timestamp'),
+                description=metadata.get('description', ''),
+                units=metadata.get('units', ''),
+                min_value=metadata.get('min'),
+                max_value=metadata.get('max'),
+                category=metadata.get('category', 'general'),
+                quality=metadata.get('quality', 'good'),
+                writable=metadata.get('writable', False),
+                simulation_type=metadata.get('simulation_type')
+            )
+
         # Define Query type
         class Query(graphene.ObjectType):
             # Get single tag
@@ -2172,66 +2451,119 @@ class GraphQLPublisher(DataPublisher):
                 description="Get statistics about available tags"
             )
             
-            def resolve_tag(self, info, name):
+            def resolve_tag(root, info, name):
                 """Resolve single tag query."""
-                if name in self.tags_data:
-                    tag_data = self.tags_data[name]
-                    metadata = self.tag_metadata.get(name, {})
-                    return TagType(
-                        name=name,
-                        value=tag_data.get('value'),
-                        type=metadata.get('type', 'unknown'),
-                        timestamp=tag_data.get('timestamp'),
-                        description=metadata.get('description', ''),
-                        units=metadata.get('units', ''),
-                        min_value=metadata.get('min'),
-                        max_value=metadata.get('max'),
-                        category=metadata.get('category', 'general'),
-                        quality=metadata.get('quality', 'good'),
-                        writable=metadata.get('writable', False),
-                        simulation_type=metadata.get('simulation_type')
-                    )
-                return None
-            
-            def resolve_tags(self, info, filter=None):
+                tag_data = publisher.tags_data.get(name)
+                if tag_data is None:
+                    return None
+                return build_tag(name, tag_data)
+
+            def resolve_tags(root, info, filter=None):
                 """Resolve all tags query with optional filtering."""
                 tags = []
-                for name, tag_data in self.tags_data.items():
+                # Snapshot the dict: publish() writes to it from the polling
+                # thread, which would otherwise resize it mid-iteration.
+                for name, tag_data in list(publisher.tags_data.items()):
                     # Apply filter if provided
                     if filter and filter.lower() not in name.lower():
                         continue
-                    
-                    metadata = self.tag_metadata.get(name, {})
-                    tags.append(TagType(
-                        name=name,
-                        value=tag_data.get('value'),
-                        type=metadata.get('type', 'unknown'),
-                        timestamp=tag_data.get('timestamp'),
-                        description=metadata.get('description', ''),
-                        units=metadata.get('units', ''),
-                        min_value=metadata.get('min'),
-                        max_value=metadata.get('max'),
-                        category=metadata.get('category', 'general'),
-                        quality=metadata.get('quality', 'good'),
-                        writable=metadata.get('writable', False),
-                        simulation_type=metadata.get('simulation_type')
-                    ))
+
+                    tags.append(build_tag(name, tag_data))
                 return tags
-            
-            def resolve_stats(self, info):
+
+            def resolve_stats(root, info):
                 """Resolve stats query."""
                 return TagStatsType(
-                    count=len(self.tags_data),
-                    tags=list(self.tags_data.keys())
+                    count=len(publisher.tags_data),
+                    tags=list(publisher.tags_data.keys())
                 )
-        
-        # Bind tags_data and metadata to Query class for resolvers
-        Query.tags_data = self.tags_data
-        Query.tag_metadata = getattr(self, 'tag_metadata', {})
-        
+
         # Create schema
         self.schema = graphene.Schema(query=Query)
-    
+
+    def _setup_routes(self, graphiql: bool):
+        """
+        Register the /graphql endpoint.
+
+        Hand-rolled over graphene's schema.execute() rather than a view library:
+        flask-graphql is unmaintained and pins graphql-core<3, which cannot
+        coexist with graphene 3.
+
+        Args:
+            graphiql: Serve the GraphiQL IDE for plain browser GETs
+        """
+
+        @self.app.route('/graphql', methods=['GET', 'POST'])
+        def graphql_endpoint():
+            """Execute a GraphQL query and return the JSON result."""
+            payload = request.get_json(silent=True) or {}
+            query = payload.get('query') or request.args.get('query')
+
+            # A browser hitting /graphql with no query gets the IDE, matching
+            # what flask-graphql used to serve here.
+            if not query:
+                if request.method == 'GET' and graphiql:
+                    return self._graphiql_html()
+                return jsonify({"errors": [{"message": "Must provide query string."}]}), 400
+
+            try:
+                result = self.schema.execute(
+                    query,
+                    variables=payload.get('variables'),
+                    operation_name=payload.get('operationName') or request.args.get('operationName')
+                )
+            except Exception as e:
+                self.logger.error(f"Error executing GraphQL query: {e}")
+                return jsonify({"errors": [{"message": str(e)}]}), 500
+
+            response = {}
+            if result.errors:
+                for error in result.errors:
+                    self.logger.warning(f"GraphQL query error: {error}")
+                response["errors"] = [
+                    error.formatted if hasattr(error, 'formatted') else {"message": str(error)}
+                    for error in result.errors
+                ]
+            if result.data is not None:
+                response["data"] = result.data
+
+            # Partial results still return 200; only a total failure is a 400.
+            status = 400 if result.errors and result.data is None else 200
+            return jsonify(response), status
+
+    def _graphiql_html(self) -> str:
+        """
+        Render the GraphiQL IDE page.
+
+        Opt-in only ("graphiql": true) because these assets come from a public
+        CDN. In an air-gapped cluster the page loads but stays blank — the API
+        keeps working regardless. Vendoring GraphiQL would add ~1MB to the image
+        for a developer convenience, so it is left as a deliberate opt-in.
+        """
+        return """<!DOCTYPE html>
+<html>
+  <head>
+    <title>GraphiQL - Emberburn</title>
+    <style>body { height: 100vh; margin: 0; } #graphiql { height: 100vh; }</style>
+    <link rel="stylesheet" href="https://unpkg.com/graphiql@3.0.9/graphiql.min.css" />
+  </head>
+  <body>
+    <div id="graphiql">Loading GraphiQL...</div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/graphiql@3.0.9/graphiql.min.js"></script>
+    <script>
+      const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+      root.render(
+        React.createElement(GraphiQL, {
+          fetcher: GraphiQL.createFetcher({ url: window.location.pathname })
+        })
+      );
+    </script>
+  </body>
+</html>"""
+
+
     def start(self):
         """Start the GraphQL API server."""
         if not self.enabled or not GRAPHQL_AVAILABLE:
@@ -2719,11 +3051,21 @@ class PrometheusPublisher(DataPublisher):
         """Record a message sent by a publisher."""
         if not self.enabled:
             return
-        
+
         try:
             self.publisher_messages_sent.labels(publisher_name=publisher_name).inc()
         except Exception as e:
             self.logger.error(f"Error recording publisher message: {e}")
+
+    def record_publish_duration(self, publisher_name: str, seconds: float):
+        """Record how long one publisher took to publish a single tag."""
+        if not self.enabled:
+            return
+
+        try:
+            self.publish_duration.labels(publisher_name=publisher_name).observe(seconds)
+        except Exception as e:
+            self.logger.error(f"Error recording publish duration: {e}")
     
     def record_publisher_error(self, publisher_name: str):
         """Record a publisher error."""
@@ -3525,7 +3867,54 @@ class DataTransformationPublisher(DataPublisher):
 
 class PublisherManager:
     """Manages multiple data publishers."""
-    
+
+    # Display names keyed by class name with the 'Publisher' suffix stripped.
+    # These strings are the contract with the web UI: publishers.js keys its
+    # PROTOCOL_ICONS map off them and the toggle endpoint matches on them, so a
+    # key that does not match a real class silently breaks both. ('REST API'
+    # used to be listed here, but RESTAPIPublisher stems to 'RESTAPI' — the
+    # entry never matched, leaving the REST row unnamed and un-toggleable.)
+    PUBLISHER_DISPLAY_NAMES = {
+        'MQTT': 'MQTT',
+        'RESTAPI': 'REST API',
+        'SparkplugB': 'Sparkplug B',
+        'Kafka': 'Kafka',
+        'AMQP': 'AMQP',
+        'WebSocket': 'WebSocket',
+        'ModbusTCP': 'MODBUS TCP',
+        'GraphQL': 'GraphQL',
+        'InfluxDB': 'InfluxDB',
+        'Alarms': 'Alarms',
+        'OPCUAClient': 'OPC UA Client',
+        'Prometheus': 'Prometheus',
+        'SQLitePersistence': 'SQLite Persistence',
+        'DataTransformation': 'Data Transformation',
+    }
+
+    # Shown on the publisher cards in the web UI. Keyed by display name.
+    PUBLISHER_DESCRIPTIONS = {
+        'MQTT': 'Publishes tag values to an MQTT broker',
+        'REST API': 'HTTP REST API and web UI for tags and publishers',
+        'Sparkplug B': 'Sparkplug B payloads for Ignition and SCADA systems',
+        'Kafka': 'Streams tag values to Apache Kafka topics',
+        'AMQP': 'Publishes to an AMQP broker such as RabbitMQ',
+        'WebSocket': 'Pushes live tag updates over WebSocket',
+        'MODBUS TCP': 'Exposes tag values as Modbus TCP registers',
+        'GraphQL': 'GraphQL query endpoint for tag data',
+        'InfluxDB': 'Writes tag history to InfluxDB',
+        'Alarms': 'Evaluates alarm rules and dispatches notifications',
+        'OPC UA Client': 'Forwards tags to an upstream OPC UA server',
+        'Prometheus': 'Exposes tag and publisher metrics for scraping',
+        'SQLite Persistence': 'Persists tag history to a local SQLite database',
+        'Data Transformation': 'Derives computed tags from source tag values',
+    }
+
+    @classmethod
+    def _friendly_name(cls, publisher) -> str:
+        """Map a publisher instance to its display name."""
+        class_name = publisher.__class__.__name__.replace('Publisher', '')
+        return cls.PUBLISHER_DISPLAY_NAMES.get(class_name, class_name)
+
     def __init__(self, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
         """
         Initialize the publisher manager.
@@ -3537,8 +3926,10 @@ class PublisherManager:
         self.config = config
         self.logger = logger or logging.getLogger("PublisherManager")
         self.publishers = []
+        # Distinct tag names seen by publish_to_all, used for the
+        # emberburn_tags_total gauge.
+        self._published_tags = set()
 
-        
     def initialize_publishers(self):
         """Initialize all configured publishers."""
         publishers_config = self.config.get("publishers", {})
@@ -3654,9 +4045,14 @@ class PublisherManager:
         # Setup API callbacks for REST API publisher
         for publisher in self.publishers:
             if isinstance(publisher, RESTAPIPublisher):
-                # Set publisher statuses callback
-                publisher._publisher_statuses = self.get_publisher_statuses()
-                
+                # Set publisher statuses callback. Must stay a callback, not a
+                # materialised list — the UI polls this every 2s and needs to
+                # see toggles take effect.
+                publisher._statuses_callback = self.get_publisher_statuses
+
+                # Expose the full gateway config for the UI's config export.
+                publisher.runtime_config = self.config
+
                 # Set toggle callback
                 def toggle_callback(name):
                     return self.toggle_publisher(name)
@@ -3692,19 +4088,25 @@ class PublisherManager:
             value: Tag value
             timestamp: Optional timestamp
         """
+        self._published_tags.add(tag_name)
+
         for publisher in self.publishers:
             try:
+                publish_started = time.monotonic()
                 publisher.publish(tag_name, value, timestamp)
-                
+                publish_elapsed = time.monotonic() - publish_started
+
                 # Update Prometheus metrics for successful publish
                 if isinstance(publisher, PrometheusPublisher):
                     continue  # Don't record metrics publisher itself
-                    
+
                 prometheus_pub = self._get_prometheus_publisher()
                 if prometheus_pub:
                     publisher_name = publisher.__class__.__name__.replace('Publisher', '')
                     prometheus_pub.record_publisher_message(publisher_name)
-                    
+                    prometheus_pub.record_publish_duration(publisher_name, publish_elapsed)
+
+
             except Exception as e:
                 self.logger.error(f"Error publishing to {publisher.__class__.__name__}: {e}")
                 
@@ -3717,8 +4119,7 @@ class PublisherManager:
         # Update system metrics
         prometheus_pub = self._get_prometheus_publisher()
         if prometheus_pub:
-            # Count unique tags (would need to track this properly in real implementation)
-            prometheus_pub.update_system_metrics(tags_count=1)  # Placeholder
+            prometheus_pub.update_system_metrics(tags_count=len(self._published_tags))
     
     def _get_prometheus_publisher(self):
         """Get the Prometheus publisher instance."""
@@ -3731,59 +4132,20 @@ class PublisherManager:
         """Get status of all publishers."""
         statuses = []
         for publisher in self.publishers:
-            # Determine publisher name
-            class_name = publisher.__class__.__name__.replace('Publisher', '')
-            
-            # Map class names to friendly names
-            name_map = {
-                'MQTT': 'MQTT',
-                'REST API': 'REST API',
-                'SparkplugB': 'Sparkplug B',
-                'Kafka': 'Kafka',
-                'AMQP': 'AMQP',
-                'WebSocket': 'WebSocket',
-                'ModbusTCP': 'MODBUS TCP',
-                'GraphQL': 'GraphQL',
-                'InfluxDB': 'InfluxDB',
-                'Alarms': 'Alarms',
-                'OPCUAClient': 'OPC UA Client',
-                'Prometheus': 'Prometheus',
-                'SQLitePersistence': 'SQLite Persistence'
-            }
-            
-            friendly_name = name_map.get(class_name, class_name)
-            
+            friendly_name = self._friendly_name(publisher)
             statuses.append({
                 'name': friendly_name,
                 'enabled': publisher.enabled,
-                'class': publisher.__class__.__name__
+                'class': publisher.__class__.__name__,
+                'description': self.PUBLISHER_DESCRIPTIONS.get(friendly_name, '')
             })
-        
+
         return statuses
     
     def toggle_publisher(self, publisher_name: str):
         """Toggle a publisher on/off."""
         for publisher in self.publishers:
-            class_name = publisher.__class__.__name__.replace('Publisher', '')
-            name_map = {
-                'MQTT': 'MQTT',
-                'REST API': 'REST API',
-                'SparkplugB': 'Sparkplug B',
-                'Kafka': 'Kafka',
-                'AMQP': 'AMQP',
-                'WebSocket': 'WebSocket',
-                'ModbusTCP': 'MODBUS TCP',
-                'GraphQL': 'GraphQL',
-                'InfluxDB': 'InfluxDB',
-                'Alarms': 'Alarms',
-                'OPCUAClient': 'OPC UA Client',
-                'Prometheus': 'Prometheus',
-                'SQLitePersistence': 'SQLite Persistence'
-            }
-            
-            friendly_name = name_map.get(class_name, class_name)
-            
-            if friendly_name == publisher_name:
+            if self._friendly_name(publisher) == publisher_name:
                 publisher.enabled = not publisher.enabled
                 if publisher.enabled:
                     try:

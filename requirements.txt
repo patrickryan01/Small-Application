@@ -1,5 +1,16 @@
+# KNOWN UNFIXED: CVE-2022-25304 / PYSEC-2026-888 — unauthenticated DoS. A client
+# can open a session and stream unlimited huge chunks without ever sending the
+# final closing chunk, exhausting memory. It affects ALL versions of `opcua` AND
+# of its successor `asyncua`, so there is no upgrade that resolves it.
+#
+# Mitigations already in the chart: the NetworkPolicy restricts 4840 to the
+# cluster, and pod memory limits bound the blast radius to a pod restart rather
+# than a node. Do not expose 4840 to an untrusted network.
 opcua>=0.98.0
-paho-mqtt>=1.6.0
+# Upper bound is load-bearing: pysparkplug requires paho-mqtt<2, and paho 2.x
+# changed the callback API (CallbackAPIVersion). Unbounded, a fresh install
+# resolves paho 2.x and Sparkplug B silently stops connecting.
+paho-mqtt>=1.6.0,<2.0.0
 flask>=3.0.0
 flask-cors>=4.0.0
 requests>=2.31.0
@@ -8,3 +19,22 @@ pika>=1.3.0
 pymodbus>=3.5.0
 influxdb-client>=1.38.0
 prometheus-client>=0.19.0
+websocket-server>=0.6.4
+twilio>=9.0.0
+graphene>=3.4.3,<4.0.0
+pysparkplug>=0.6.1
+
+# Transitive pins for CVE remediation. Neither is imported directly — click
+# arrives via flask, cryptography via opcua — but without a floor a rebuild can
+# resolve a vulnerable version. Verified with `pip-audit -r requirements.txt`.
+click>=8.3.3            # PYSEC-2026-2132
+cryptography>=48.0.1    # GHSA-537c-gmf6-5ccf
+
+# SparkplugBPublisher uses pysparkplug (above), not the `sparkplug_b` module it
+# imported until 4.1.9 — no such distribution has ever existed on PyPI, so the
+# publisher could never start. pysparkplug owns the protobuf encoding and the
+# birth/death state machine rather than hand-rolling them.
+#
+# GraphQLPublisher needs only graphene (above). It serves /graphql from a plain
+# Flask view over schema.execute(), so no flask-graphql — that package is
+# unmaintained and pins graphql-core<3, which graphene 3 cannot use.

@@ -55,7 +55,7 @@ What started as "let me add MQTT real quick" has spiraled into something my ther
 |----------|-------------|----------------|-------------------------------|
 | **OPC UA Server** | The core. Serves tags to any OPC UA client. | This was the original idea. Pure. Innocent. | 😊 Hopeful |
 | **MQTT** | Publishes tag data to any MQTT broker | "IoT is the future" | 🤔 Optimistic |
-| **Sparkplug B** | Native Ignition Edge protocol | "Inductive will love this" | 😏 Strategic |
+| **Sparkplug B** | Native Ignition Edge protocol | "Inductive will love this" | 😅 Fixed in 4.1.9 |
 | **REST API** | HTTP endpoints for tag CRUD | "Even my PM knows what REST is" | 😐 Practical |
 | **GraphQL** | Modern query interface for tags | "REST is so 2015" | 🧐 Pretentious |
 | **Apache Kafka** | Enterprise event streaming | "I need to justify my Confluent subscription" | 💼 Corporate |
@@ -69,7 +69,21 @@ What started as "let me add MQTT real quick" has spiraled into something my ther
 | **SQLite Persistence** | Local historical storage + audit logs | "Data should survive a reboot, probably" | 🗄️ Adulting |
 | **Data Transformation** | Unit conversion, scaling, computed tags | "Math is a protocol now, fight me" | 🧮 Deranged |
 
-All of these run **simultaneously**. At the same time. In the same process. Like a one-man-band at the intersection of DevOps and industrial automation. Is it beautiful? Debatable. Does it work? Absolutely. Will I add more? My keyboard is warm and my impulse control is nonexistent.
+All of these run **simultaneously**. At the same time. In the same process. Like a one-man-band at the intersection of DevOps and industrial automation. Is it beautiful? Debatable. Does it work? Mostly. Will I add more? My keyboard is warm and my impulse control is nonexistent.
+
+## Confession Time (The "15" Was Doing Some Heavy Lifting)
+
+I audited that table in 4.1.9. Two rows were writing checks the code could not cash. In the interest of not being the guy whose README lies to you:
+
+**GraphQL** had never started. Not "started badly." Never started, not once, in any shipped image. I wired it to `flask-graphql`, which pins `graphql-core<3`. `graphene` needs `graphql-core>=3.1`. Those two cannot coexist in the same virtualenv, so `pip install` quietly failed, the import guard politely caught the `ImportError`, GraphQL disabled itself, and I never noticed because I never looked. It's ported and working as of 4.1.9. You can actually query it now. I'm as surprised as you are.
+
+**Sparkplug B** was worse, and I'm not dressing it up. The publisher imported a module called `sparkplug_b`. That package does not exist on PyPI. It was not vendored in this repo. It was never installable by anyone, ever. A genuinely well-written publisher for a library that, as far as Python is concerned, was imaginary.
+
+And it got better: where it *did* build payloads, it sent **JSON** to `spBv1.0/` topics. Sparkplug B is protobuf. So even in the fantasy universe where the import worked, no real consumer — Ignition, Chariot, HiveMQ — could have decoded a single message. It was hand-rolling sequence numbers and `bdSeq` and birth/death ordering, which are exactly the parts of the spec that are easy to get quietly wrong, in service of a wire format that was wrong anyway.
+
+Rewritten onto `pysparkplug` in 4.1.9. Real protobuf, real NBIRTH/DBIRTH/DDATA/NDEATH lifecycle, and the library owns the sequencing so I can't get it wrong again. There's a test — `test_sparkplug.py` — that stands up an in-process broker, sniffs the wire, and asserts the payloads decode as protobuf and specifically **are not JSON**, because that's the bug that hid for a year behind an import guard.
+
+So: 15 protocols, 15 of which actually run. Took an embarrassing audit to get there. Honesty is a feature.
 
 ## The Tag System (Where the Magic Happens)
 
@@ -120,10 +134,12 @@ Emberburn ships with a full **Python Flask web application** — fire-themed dar
 - 🏷️ **Tag Monitor** — Every tag, every value, updating in real-time. It's like watching the Matrix but for industrial data.
 - 📡 **Publishers** — See which protocols are running, enable/disable them, feel like a DJ mixing data streams
 - 🚨 **Alarms** — Active alerts, alarm history, threshold configuration. Sleep is overrated anyway.
-- ⚙️ **Configuration** — Edit settings without touching JSON files. We're civilized now.
+- ⚙️ **Configuration** — Server info, config export, and a live log viewer. Until 4.1.9 this page had four buttons that all popped `alert('Feature coming soon!')`. They do things now. The two that were never going to happen got deleted instead of faked.
 - 🏗️ **Tag Generator** — Create new OPC UA tags from the browser. Point and click your way to industrial simulation.
 
 The UI updates every 2 seconds because real-time means REAL TIME, and it's all wrapped in a dark mode fire aesthetic because we're EmberBurn, not EmberBoring.
+
+**About that Tag Generator.** It shipped as a complete, polished, fully-wired UI talking to a backend that was connected to absolutely nothing. Every create, every write, every bulk import returned `501 Write not supported`, because the callback that hands the REST publisher a way into the OPC UA address space was only ever wired to a different publisher entirely. And underneath *that*, the write function had no `return` statement — so even once I fixed the wiring, every successful write would have reported itself as a failure. Two independent bugs stacked on the same code path, and a delete endpoint that cleared a cache the next update cycle refilled two seconds later while cheerfully returning `success: true`. All three fixed in 4.1.9. The Tag Generator is a real feature now instead of an elaborate diorama.
 
 ## Architecture (For the Diagram People)
 
@@ -175,6 +191,30 @@ All publishers are **opt-in via config**. Don't want Kafka? Don't enable it. Don
 **Systemd?** Old school, I respect it. Service files included. Set it and forget it like a crockpot.
 
 **Just... Python?** `pip install -r requirements.txt` and `python opcua_server.py`. You're an adult. I believe in you.
+
+## Security (New in 4.1.9, Previously a Rumor)
+
+Let me tell you what this looked like before 4.1.9. Grep the entire codebase for `login_required`, `authenticate`, `Authorization`, `jwt`, `api_key` — zero hits. Not one. CORS was open to every origin on the internet. `POST` and `DELETE` on `/api/tags/*` took anyone who could reach the port. The OPC UA endpoint sat on `0.0.0.0:4840` anonymous and unencrypted.
+
+On an industrial gateway. With an ingress template shipped in the box.
+
+I'd like to say this was a considered threat model. It was not. It was scope creep's evil twin: scope *omission*.
+
+**What it does now:**
+
+- **Writes need a token.** `POST`/`PUT`/`PATCH`/`DELETE` on `/api/*` require an `X-EmberBurn-Token` header. Reads stay open, because the dashboard polls them constantly and there's no session to authenticate against
+- **The UI still just works.** The pod injects the token into the HTML it serves, so the dashboard iframe has zero login prompts, zero redirects, zero usernames. It authenticates itself and you never see it
+- **Unless you don't want that.** Set `security.uiWrites: false` and the UI drops to read-only while your automation, holding the token, keeps writing. That's the setting you want if this is reachable from anything you don't trust — because if the UI can write without a login, anyone who can load the UI can write. I can't engineer that away, so I gave you a switch instead of pretending
+- **CORS is same-origin** by default now. Widen it deliberately via `security.corsOrigins`
+- **OPC UA gets real auth** — Basic256Sha256 signing and encryption, plus username/password against a Secret. It's **off by default**, because turning it on breaks every anonymous SCADA client you own until each one is reconfigured with credentials and a trusted cert. Your call, your timeline. If you enable it half-configured it refuses to start rather than quietly serving plaintext and letting you believe you're encrypted
+
+Credentials come from a Helm-managed Secret, or point `security.existingSecret` at sealed-secrets / external-secrets / vault and keep them out of the chart entirely.
+
+Still not a hardened appliance. It's a simulator that grew up in public. But "no auth whatsoever" is no longer the answer to "how is this secured."
+
+**One known unfixed CVE, and I'm telling you about it rather than hoping you don't run `pip-audit`.** `CVE-2022-25304` in the `opcua` library: a client can open a session and stream unlimited huge chunks without ever sending the final closing chunk, and eat all your memory. It's an unauthenticated DoS. There is no patched release — it affects **every** version of `opcua` *and* every version of its successor `asyncua`, so there's nothing to upgrade to.
+
+What's in place instead: the chart's NetworkPolicy keeps 4840 inside the cluster, and the pod memory limits mean the worst case is a pod restart rather than a dead node. **Don't put port 4840 on an untrusted network.** Dependencies are audited with `pip-audit -r requirements.txt`; the two transitive CVEs it also found (`click`, `cryptography`) are pinned out in `requirements.txt`.
 
 ## Environment Variables
 

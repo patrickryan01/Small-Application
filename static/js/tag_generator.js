@@ -253,7 +253,7 @@ const TagGenerator = (function () {
     // ── Export ──
     async function exportTags(format) {
         try {
-            var response = await fetch('/api/tags/export?format=' + format);
+            var response = await fetch(window.emberburnUrl('/api/tags/export?format=' + format));
             if (!response.ok) throw new Error('Export failed');
             var blob = await response.blob();
             var url = URL.createObjectURL(blob);

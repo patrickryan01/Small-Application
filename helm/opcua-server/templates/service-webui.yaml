@@ -11,8 +11,22 @@ metadata:
     {{- with .Values.service.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+    # Injected by the dashboard (store.go:1304-1315). A Service without
+    # embernet.ai/tenant is filtered out of every tenant-scoped view
+    # (services.go:226) — visible to SuperAdmin, invisible to the customer.
+    {{- with .Values.tenantLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   annotations:
-    embernet.ai/app-icon: {{ .Values.embernet.appIcon | default "https://avatars.githubusercontent.com/u/254966106?s=200&v=4" | quote }}
+    # Annotation, never a label: label values cannot contain '/' or ':'.
+    # Read by the dashboard at client.go:307-309 (EmberNET App Store chart
+    # contract §3). Also set on the pod template — §9.5: setting it only here
+    # leaves node cards showing a generic glyph.
+    #
+    # Defaults to an embedded data URI rather than a URL. Embernet clusters are
+    # air-gapped so a remote URL renders broken, and a pod-relative path would
+    # resolve against the dashboard's origin, not ours.
+    embernet.ai/app-icon: {{ include "emberburn.appIcon" . | quote }}
     {{- if .Values.embernet.displayName }}
     embernet.ai/display-name: {{ .Values.embernet.displayName | quote }}
     {{- end }}

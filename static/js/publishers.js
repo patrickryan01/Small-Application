@@ -13,7 +13,10 @@ const PROTOCOL_ICONS = {
     'InfluxDB': '📊',
     'MODBUS TCP': '🔧',
     'OPC UA Client': '🔗',
-    'Alarms': '🚨'
+    'Alarms': '🚨',
+    'Prometheus': '📈',
+    'SQLite Persistence': '💾',
+    'Data Transformation': '🔀'
 };
 
 async function updatePublishersView() {
@@ -46,15 +49,12 @@ function renderPublishersGrid(publishersData) {
                 </span>
             </div>
             <div class="publisher-description">
-                ${pub.description || 'Data publishing protocol'}
+                ${escapeHTML(pub.description || 'Data publishing protocol')}
             </div>
             <div class="publisher-actions">
                 <button class="btn ${pub.enabled ? 'btn-danger' : 'btn-success'}" 
                         onclick="togglePublisher('${escapeHTML(pub.name)}')">
                     ${pub.enabled ? '⏸️ Disable' : '▶️ Enable'}
-                </button>
-                <button class="btn btn-secondary" onclick="alert('Config editor coming soon!')">
-                    ⚙️ Config
                 </button>
             </div>
         </div>

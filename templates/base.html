@@ -82,10 +82,11 @@
             var isLight = document.body.classList.toggle('light-mode');
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
 
-            var logo = document.getElementById('header-logo');
-            if (logo) {
-                logo.src = "{{ url_for('web_ui.static', filename='images/emberburn-chart-icon.png') }}";
-            }
+            // NOTE: do not reassign header-logo .src here. The logo is identical
+            // in both themes, and a JS-assigned absolute path bypasses the
+            // reverse-proxy URL rewriting in RESTAPIPublisher.rewrite_proxy_urls
+            // (which only matches src="/ in markup), breaking the icon when
+            // EmberBurn is embedded in the Embernet Dashboard.
 
             var icon = document.getElementById('theme-toggle-icon');
             if (icon) {
@@ -98,8 +99,6 @@
             if (document.body.classList.contains('light-mode')) {
                 var icon = document.getElementById('theme-toggle-icon');
                 if (icon) icon.textContent = '🌙';
-                var logo = document.getElementById('header-logo');
-                if (logo) logo.src = "{{ url_for('web_ui.static', filename='images/emberburn-chart-icon.png') }}";
             }
         })();
     </script>

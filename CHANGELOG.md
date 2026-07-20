@@ -5,6 +5,195 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.9] - 2026-07-20 — App Store Contract, Air-Gapped Icons, Working Writes, 15/15 Protocols
+
+Audited the chart against the EmberNET App Store contract — the version generated
+from the dashboard Go source rather than from documentation. Four gaps. Then went
+looking at the app itself and found the write path had never worked, GraphQL had
+never been able to start, and every icon we ship pointed at the public internet.
+
+### Fixed — App Store contract
+
+- **deployment.yaml, service-*.yaml:** `.Values.tenantLabels` was never consumed
+  anywhere in the chart. The dashboard injects it at deploy
+  (`store.go:1304-1315`) and we threw it away, so nothing carried
+  `embernet.ai/tenant`. Result: Services filtered out of every tenant-scoped view
+  (`services.go:226`), POD SHELL returning 403 (`shell.go:602-615`). Visible to
+  SuperAdmin, invisible to the customer. Now on the pod template and all three
+  Services, and declared in `values.yaml`
+- **deployment.yaml:** `embernet.ai/app-icon` was Service-only. Contract §9.5 —
+  it is read from pod annotations too (`client.go:307-309`), and Service-only
+  leaves node cards showing a generic glyph
+- **deployment.yaml:** `replicas` was set unconditionally while `hpa.yaml` manages
+  the same Deployment, so Helm reverted the HPA on every upgrade. Omitted now when
+  `autoscaling.enabled`
+- **networkpolicy.yaml:** allowed 5000 and 4840 but not 8000, so turning on
+  `networkPolicy` silently killed Prometheus scraping
+
+### Fixed — icons
+
+- **_helpers.tpl, service-webui.yaml:** `embernet.ai/app-icon` pointed at
+  `avatars.githubusercontent.com`. Air-gapped clusters cannot reach it. Now an
+  embedded data URI via the new `emberburn.appIcon` helper — no network, no origin
+  assumptions. A pod-relative path was tried and rejected: it resolves against the
+  dashboard's origin, not ours
+- **Chart.yaml:** `icon:` pointed at the same avatar. Embedded data URI now
+- **base.html:** the header logo reassigned `logo.src` in JavaScript on load and
+  theme toggle. The proxy rewriter matches `src="/` in markup, not
+  `logo.src = "/` in a script, so the JS overwrote the rewritten path with a raw
+  absolute one. Both assignments were dead code — same image in both themes
+- **style.css:** dropped the Google Fonts `@import`. Same air-gap problem, which
+  is why type has been rendering in fallback fonts
+- **values.yaml:** `embernet.appIcon` defaulted to `fireball.png` — the corporate
+  shield, not the EmberBurn logo. Wrong brand even when it did load
+- **scripts/build-chart-icon.py:** new. Regenerates both embedded icons from
+  `static/images/emberburn-chart-icon.png`. Idempotent
+
+### Fixed — the write path never worked
+
+- **opcua_server.py:** `write_callback` was only wired to
+  `DataTransformationPublisher` by class-name match, so `RESTAPIPublisher`'s
+  stayed `None` and every create, write and bulk-create returned 501. Any
+  publisher exposing `set_write_callback` gets it now
+- **opcua_server.py:** `write_tag()` had no `return` statement. Callers branch on
+  the result, so even wired up, every success would have reported as a failure
+- **publishers.py, opcua_server.py:** `DELETE /api/tags/<name>` cleared only the
+  publisher cache, which `publish()` repopulated on the next cycle — the tag came
+  back in under two seconds while the API returned success. Added
+  `OPCUAServer.delete_tag()` and a delete callback
+
+### Fixed — GraphQL
+
+- **publishers.py:** `flask_graphql` pins `graphql-core<3` while `graphene` 3.x
+  needs `graphql-core>=3.1`. They cannot be installed together, which is why
+  GraphQL has never started in a shipped image. Ported onto graphene 3 with a
+  plain Flask view over `schema.execute()`
+- **publishers.py:** resolvers read `self.tags_data`, but graphene passes the root
+  value (`None` at top level) as the first resolver arg — every query would have
+  raised `AttributeError`
+- **publishers.py:** `tag_metadata` was snapshotted at `__init__`, before
+  `opcua_server` attaches it, so it stayed empty forever
+- **opcua_server.py:** `_setup_tag_metadata()` tested only for `tag_cache` while
+  its own comment claimed it covered GraphQL, which uses `tags_data`
+- **publishers.py, config_graphql.json:** GraphiQL defaults off — CDN assets. The
+  API has no external dependency
+
+### Added — security
+
+- **publishers.py:** mutating `/api/*` calls require an `X-EmberBurn-Token` header.
+  Reads stay open for the dashboard. The pod injects the token into its own HTML,
+  so the iframe works with no login prompt and no usernames anywhere.
+  `security.uiWrites: false` drops the UI to read-only for internet-facing
+  deployments while automation holding the token still writes
+- **publishers.py:** CORS was open to every origin. Same-origin by default via
+  `security.corsOrigins`
+- **opcua_server.py:** OPC UA signing, encryption and username auth via
+  `security.opcua.*`. Off by default — enabling it breaks every anonymous SCADA
+  client until each is reconfigured. Fails loudly at startup if enabled without
+  certificates or users rather than quietly serving plaintext
+- **secret.yaml:** new, with `security.existingSecret` so credentials can live in
+  sealed-secrets, external-secrets or vault instead of the chart
+
+### Fixed — release safety
+
+- **release.yml:** the chart publishes on push-to-main, the image only builds on a
+  `v*` tag. Out of order, that ships a chart pointing at an image that does not
+  exist — which is what 4.0.9 was. The workflow now refuses to package unless
+  `appVersion` matches the values image tag and
+  `ghcr.io/embernet-ai/emberburn:<version>` is already published. Order: push the
+  tag, wait for the build, merge the chart bump
+
+### Fixed — everything else
+
+- **publishers.py:** the `'REST API'` name-map key could never match —
+  `RESTAPIPublisher` stems to `RESTAPI`. UI showed "RESTAPI", icon fell back to a
+  generic glyph, toggle always returned `success: false`. The 13-entry map was
+  duplicated across two methods, which is how one drifted. One constant now
+- **publishers.py:** publisher status was snapshotted once during `start_all()`,
+  so the UI re-polled every 2s and re-rendered stale data — toggles never appeared
+  to do anything. Live callback now
+- **publishers.py:** the Prometheus tag gauge was hardcoded to `1` with a
+  `# Placeholder` comment; counts distinct published tags now. The
+  `publish_duration` histogram was created and never observed
+- **api.js:** `importTags()` posted to `/api/tags/import`, which has never existed
+  server-side. Import parses client-side and goes through `/api/tags/bulk`
+- **api.js, tags.js, tag_generator.js:** absolute `/api/...` paths broke behind the
+  dashboard's query-parameter proxy, and the relative-path workaround was wrong
+  too — it resolves against the dashboard's own path. Both go through a
+  proxy-aware base resolver now
+- **config.html:** the four "Feature coming soon!" buttons are gone. Export Config
+  and View Logs are real, backed by new `/api/config` (credentials redacted) and
+  `/api/logs` (in-memory ring buffer — the app only logs to stdout). Restart and
+  Import were deleted rather than faked; config is Helm-managed
+- **style.css, tag_generator.html:** modal CSS was inline in one template, so every
+  other page using `.modal-overlay` rendered unstyled
+- **publishers.py:** three bare `except:` clauses swallowing everything including
+  `KeyboardInterrupt`, unused `send_file` and `CollectorRegistry` imports, and an
+  API index reporting a hardcoded `localhost:5002` GraphQL URL
+- **requirements.txt:** added `websocket-server` and `twilio`. Both missing from
+  the shipped image, so the WebSocket publisher and alarm SMS could never start
+- **version.py:** new, single source of truth. `setup.py` carried its own string
+  and had drifted to 4.0.7 while the chart was on 4.1.3
+- **configmap.yaml:** deleted. Nothing mounted it, and it was the only template
+  missing `namespace`
+- **.helmignore:** the packaged chart was shipping 19 non-chart files to every
+  user, including three stale UTF-16 PowerShell error dumps from a machine that no
+  longer exists
+
+### Fixed — Sparkplug B, which had never worked
+
+- **publishers.py:** `SparkplugBPublisher` imported `sparkplug_b` — no such
+  distribution has ever existed on PyPI, and it was not vendored here, so the
+  import guard caught the `ImportError` and silently disabled the publisher for
+  the life of the project
+- **publishers.py:** where it did build payloads, it published **JSON** to
+  `spBv1.0/` topics. Sparkplug B is protobuf. The wire format was never
+  spec-compliant, so no real consumer could have decoded it even if the import had
+  resolved
+- Rewritten onto `pysparkplug`, which owns protobuf encoding, `bdSeq`, sequence
+  numbering and the NBIRTH/DBIRTH/NDEATH lifecycle. The hand-rolled versions of all
+  of those are deleted rather than ported
+- Ints now map to `INT64` rather than the old `Int32`, which would silently wrap an
+  OPC UA counter past 2.1 billion
+- Tags created after startup — the Tag Generator can do this — trigger a device
+  rebirth so the new metric is declared in a DBIRTH before its first DDATA, as the
+  spec requires
+- **requirements.txt:** `paho-mqtt` gained an upper bound. `pysparkplug` requires
+  `paho-mqtt<2` and paho 2.x changed the callback API; unbounded, a fresh install
+  resolves 2.x and Sparkplug silently stops connecting. Same class of bug as the
+  flask-graphql conflict
+- **test_sparkplug.py:** new. Stands up an in-process MQTT broker, sniffs the wire,
+  and asserts NBIRTH/DBIRTH/DDATA/NDEATH all arrive, that payloads decode as
+  Sparkplug protobuf and **are not JSON**, and that values round-trip with correct
+  datatypes. Import-level checks would not have caught either original bug
+
+### Fixed — dependency security audit
+
+- **requirements.txt:** audited with `pip-audit`. Pinned `click>=8.3.3`
+  (PYSEC-2026-2132) and `cryptography>=48.0.1` (GHSA-537c-gmf6-5ccf) — neither is
+  imported directly, but without a floor a rebuild could resolve a vulnerable
+  version
+- **KNOWN UNFIXED:** CVE-2022-25304 / PYSEC-2026-888 in `opcua` — unauthenticated
+  DoS via unlimited unterminated chunks. It affects **all** versions of `opcua` and
+  **all** versions of its successor `asyncua`, so no upgrade resolves it. Mitigated
+  by the chart's NetworkPolicy restricting 4840 to the cluster and by pod memory
+  limits bounding the blast radius to a restart. Documented in `requirements.txt`
+  and the README rather than left for someone to discover
+
+### Notes
+
+- One instance per node, unchanged. EmberBurn is absent from
+  `multiInstanceChart()` (`store.go:158-176`) and that is intended
+- Two documents in this repo contradict the source-derived contract and directly
+  caused bugs fixed here: `documentation/HELM_CHART_REQUIREMENTS (1).md` claims the
+  icon resolves from pod *labels*, and `.agent/APP_STORE_DEPLOYMENT_FLOW.md` was
+  cited by 4.1.8 as requiring a full icon URL — which is what put the GitHub avatar
+  back. Both need reconciling or retiring
+- **Chart version**: `4.1.9`, appVersion: `4.1.9`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.1.9`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.1.9.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.1.9` tag
+
 ## [4.1.8] - 2026-04-27 — App Store Deployment Flow Alignment
 
 Align the chart end-to-end with `APP_STORE_DEPLOYMENT_FLOW.md`. The chart was

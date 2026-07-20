@@ -17,15 +17,15 @@
         </div>
         <div class="info-item">
             <strong>REST API:</strong>
-            <div>http://localhost:5000/api/</div>
+            <div id="info-rest-api">—</div>
         </div>
         <div class="info-item">
             <strong>GraphQL API:</strong>
-            <div>http://localhost:5002/graphql</div>
+            <div id="info-graphql">—</div>
         </div>
         <div class="info-item">
             <strong>Platform:</strong>
-            <div>EmberBurn v1.0</div>
+            <div id="info-version">EmberBurn</div>
         </div>
     </div>
 </div>
@@ -33,10 +33,31 @@
 <div class="card" style="margin-top: 20px;">
     <h2 style="color: var(--ember-red); margin-bottom: 20px;">Quick Actions</h2>
     <div class="action-bar">
-        <button class="btn btn-primary" onclick="alert('Feature coming soon!')">🔄 Restart Server</button>
-        <button class="btn btn-secondary" onclick="alert('Feature coming soon!')">📥 Export Config</button>
-        <button class="btn btn-secondary" onclick="alert('Feature coming soon!')">📤 Import Config</button>
-        <button class="btn btn-secondary" onclick="alert('Feature coming soon!')">📊 View Logs</button>
+        <button class="btn btn-secondary" onclick="ConfigPage.exportConfig()">📥 Export Config</button>
+        <button class="btn btn-secondary" onclick="ConfigPage.viewLogs()">📊 View Logs</button>
+    </div>
+    <p style="margin-top: 12px; color: var(--smoke-gray); font-size: 13px;">
+        Configuration is applied from the Helm chart. To change it, update your
+        values and run <code>helm upgrade</code> — the pod restarts with the new
+        config. Exported config has credentials redacted.
+    </p>
+</div>
+
+<div id="logs-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <h2>Recent Logs</h2>
+            <button class="btn btn-secondary" onclick="ConfigPage.hideLogs()" style="padding: 4px 10px;">✕</button>
+        </div>
+        <pre id="logs-output" class="logs-output">Loading…</pre>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="ConfigPage.viewLogs()">🔄 Refresh</button>
+            <button class="btn btn-secondary" onclick="ConfigPage.hideLogs()">Close</button>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('web_ui.static', filename='js/config.js') }}"></script>
 {% endblock %}

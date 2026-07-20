@@ -15,6 +15,7 @@ permissions:
   contents: write          # push commits back to main
   pages: write
   id-token: write
+  packages: read           # inspect the published image before packaging
 
 concurrency:
   group: "helm-release"
@@ -57,6 +58,46 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "🆕 New version detected — packaging."
           fi
+
+      # ── 4b. Refuse to publish a chart whose image does not exist ───
+      # The chart publishes on push-to-main, but the image is only built by
+      # docker-publish.yml on a v* tag. Without this gate the two can be
+      # released out of order and users get ImagePullBackOff — which is exactly
+      # what happened with the 4.0.9 chart referencing an image never built.
+      # Release order is therefore: push the v<version> tag, wait for the
+      # multi-arch build to publish, then merge the chart bump to main.
+      - name: Log in to GitHub Container Registry
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify container image is published
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          APP_VERSION=$(grep '^appVersion:' helm/opcua-server/Chart.yaml \
+            | awk '{print $2}' | tr -d '"')
+          VALUES_TAG=$(grep -E '^\s+tag:' helm/opcua-server/values.yaml \
+            | head -1 | awk '{print $2}' | tr -d '"')
+
+          if [ "$APP_VERSION" != "$VALUES_TAG" ]; then
+            echo "::error::Chart.yaml appVersion ($APP_VERSION) does not match \
+          values.yaml image tag ($VALUES_TAG). Align them before releasing."
+            exit 1
+          fi
+
+          IMAGE="ghcr.io/embernet-ai/emberburn:$APP_VERSION"
+          echo "🔍 Checking $IMAGE ..."
+
+          if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "::error::$IMAGE is not published yet. Push tag v$APP_VERSION \
+          and let docker-publish.yml finish before merging the chart bump."
+            exit 1
+          fi
+
+          echo "✅ $IMAGE exists — safe to publish the chart."
 
       # ── 5. Remove stale packages ──────────────────────────────────
       - name: Remove old .tgz packages

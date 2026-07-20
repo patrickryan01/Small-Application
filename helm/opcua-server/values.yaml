@@ -3,8 +3,15 @@
 # NOTE: Do NOT create Namespace resources in Helm charts.
 # Use: helm install <release> ./chart -n <namespace> --create-namespace
 
+# Name overrides (consumed by templates/_helpers.tpl)
+# nameOverride     — replaces the chart name in resource names and labels
+# fullnameOverride — replaces the full "<release>-<chart>" resource name outright
+nameOverride: ""
+fullnameOverride: ""
+
 # Pod configuration
 pod:
+  # Ignored when autoscaling.enabled is true — the HPA owns the replica count.
   replicaCount: 1
 
   annotations:
@@ -23,7 +30,7 @@ pod:
 emberburn:
   image:
     repository: ghcr.io/embernet-ai/emberburn
-    tag: "4.1.1"
+    tag: "4.1.9"
     pullPolicy: IfNotPresent # Use Always for development, IfNotPresent for production
 
   # OPC UA Server configuration
@@ -40,14 +47,17 @@ emberburn:
     opcua: 4840 # OPC UA Server
     webui: 5000 # REST API + Web UI
     prometheus: 8000 # Prometheus metrics
+    # RESERVED — not yet wired into any template. Declared so the port map stays
+    # complete; setting them today has no effect on the rendered manifests.
     modbus: 5020 # Modbus TCP (if enabled)
     websocket: 9001 # WebSocket (if enabled)
 
   # Environment variables
+  # NOTE: UPDATE_INTERVAL and LOG_LEVEL come from emberburn.opcua.* below,
+  # not from here — deployment.yaml reads emberburn.opcua.updateInterval /
+  # emberburn.opcua.logLevel.
   env:
     pythonUnbuffered: "1"
-    updateInterval: "2.0"
-    logLevel: "INFO"
 
   # Resource presets (small, medium, large, custom)
   resources:
@@ -91,10 +101,12 @@ emberburn:
   # Health checks - probe the Flask web UI (port 5000), NOT OPC UA (4840).
   # OPC UA server initialization is slow (tag loading, protocol handshake).
   # Flask starts instantly and is a reliable liveness indicator.
+  # The probes target the container's named "webui" port so they track
+  # emberburn.ports.webui automatically instead of hardcoding 5000.
   livenessProbe:
     enabled: true
     tcpSocket:
-      port: 5000
+      port: webui
     initialDelaySeconds: 45
     periodSeconds: 15
     timeoutSeconds: 5
@@ -103,7 +115,7 @@ emberburn:
   readinessProbe:
     enabled: true
     tcpSocket:
-      port: 5000
+      port: webui
     initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 3
@@ -123,6 +135,8 @@ emberburn:
 
 # Configuration - Tags and Publishers
 config:
+  # RESERVED — not yet wired into any template. The chart always renders the
+  # tags/publishers ConfigMaps from the values below.
   # Use existing config from existing chart or define new
   useExisting: false
 
@@ -320,8 +334,9 @@ flux:
   # -- Service name used in the Flux virtual address
   # Final address: <serviceName>-<site>-<node>.flux.internal
   serviceName: ""  # defaults to Chart.Name ("emberburn")
-  # -- Port to expose through the mesh (defaults to service.webui.port)
-  port: 5000
+  # -- Port to expose through the mesh. Leave null to follow service.webui.port;
+  # set an explicit port only to override it.
+  port: null
   # -- Role attributes for policy matching
   roleAttributes: "gui-services"
   # -- Also expose the OPC UA service on the Flux mesh
@@ -338,13 +353,17 @@ embernet:
   displayName: ""          # Annotation: "Plant Floor / EmberBurn Production"
   guiType: "web"           # Mirrors gui.type — kept for backward compat
   device: ""               # Digital twin device: "plc-conveyor-01"
-  appIcon: ""              # Full URL; empty = use chart's default GitHub avatar
+  # Value for the embernet.ai/app-icon annotation. Empty uses the EmberBurn
+  # logo embedded in _helpers.tpl as a data URI, which works air-gapped and is
+  # independent of which origin the dashboard renders it from. Override with a
+  # URL only if your cluster can actually reach it.
+  appIcon: ""
 
 # GUI configuration — canonical EmberNET template section
 # These values drive the storeLabels helper for dashboard discovery
 gui:
-  enabled: true
-  port: 5000               # Web UI port (matched to service.webui.port)
+  enabled: true            # RESERVED — no template reads this yet; GUI labels are always emitted
+  port: null               # Leave null to follow service.webui.port; set to override
   type: "web"              # "web" | "shell" | "web+shell" | "none"
   displayName: ""          # Override app name on dashboard cards
 
@@ -370,7 +389,7 @@ affinity: {}
 # (`<release>.<ns>.svc.cluster.local:<port>`); hostNetwork bypasses that path.
 network:
   hostNetwork: false       # DEFAULT FALSE — dashboard proxy + multi-instance
-  extraPorts: []
+  extraPorts: []           # RESERVED — not yet wired into deployment.yaml
 
 # Pod Disruption Budget
 podDisruptionBudget:
@@ -397,6 +416,10 @@ networkPolicy:
       ports:
         - protocol: TCP
           port: 4840
+        # Prometheus metrics — service-prometheus.yaml/servicemonitor.yaml scrape
+        # this port. Without it, enabling networkPolicy silently breaks scraping.
+        - protocol: TCP
+          port: 8000
 
   egress:
     - {} # Allow all egress by default
@@ -419,6 +442,8 @@ monitoring:
     labels: {}
 
 # External dependencies (optional integrations)
+# RESERVED — no template reads this section. Point the publishers at external
+# services via config.publishers.mqtt.broker / config.publishers.influxdb.url.
 external:
   # MQTT Broker (if not using external)
   mqtt:
@@ -433,4 +458,64 @@ external:
     port: 8086
 
 # Environment variable sources (for Secrets/ConfigMaps)
+# RESERVED — not yet wired into deployment.yaml.
 envFrom: []
+
+# ── Security ────────────────────────────────────────────────────────────────
+security:
+  # Name of a pre-existing Secret holding `apiKey` and/or `opcuaUsers`. Set this
+  # to manage credentials outside the chart (sealed-secrets, external-secrets,
+  # vault); when set, the chart creates no Secret of its own.
+  existingSecret: ""
+
+  # Shared token required on mutating REST calls (POST/PUT/DELETE on /api/*).
+  # Reads stay open so the Embernet Dashboard can keep polling. Leave empty to
+  # generate one at pod startup — writes then work from the UI but the token is
+  # not knowable by external automation until you set it explicitly.
+  apiKey: ""
+
+  # Whether the web UI itself may write. The pod injects the token into the page
+  # it serves, so the dashboard iframe keeps working with no login prompt.
+  #
+  # IMPORTANT: with ingress.enabled=true this means anyone who can load the page
+  # can also write. For an internet-reachable deployment set this to false — the
+  # UI becomes read-only and only clients holding the token (automation, curl)
+  # can mutate tags.
+  uiWrites: true
+
+  # Allowed CORS origins. Empty list = same-origin only, which is what the
+  # dashboard proxy needs. Previously CORS was wide open to every origin.
+  corsOrigins: []
+
+  opcua:
+    # Require signing + encryption on port 4840. OFF by default because turning
+    # it on breaks every existing anonymous SCADA client until each is
+    # reconfigured with credentials and a trusted certificate. This is entirely
+    # separate from the web UI and does not affect the dashboard iframe.
+    enabled: false
+
+    # Certificate and key paths inside the container. Required when enabled.
+    # Mount them via a Secret volume; the chart does not generate certificates.
+    certFile: "/app/certs/server-cert.der"
+    keyFile: "/app/certs/server-key.pem"
+
+    # Allow anonymous OPC UA sessions. Set false to require credentials from
+    # security.opcua.users.
+    allowAnonymous: true
+
+    # "user1:pass1,user2:pass2" — stored in the chart-managed Secret. Required
+    # when allowAnonymous is false. Prefer existingSecret for real deployments.
+    users: ""
+
+# ── Dashboard-injected values ───────────────────────────────────────────────
+# The EmberNET dashboard sets these at deploy time (store.go:1304-1315 for the
+# HelmChart path, :1182-1191 for Fleet). The chart is responsible for rendering
+# them onto the pod template and Services — declared here so `helm show values`
+# documents them and so a manual `helm install` can supply them.
+#
+# Omitting embernet.ai/tenant is the most common silent failure: the app stays
+# visible to SuperAdmin while disappearing from every tenant-scoped view.
+tenantLabels: {}
+#  embernet.ai/tenant: "tranetech-ut3"
+#  embernet.ai/deployed-by: "patrick@fireballz.ai"
+#  embernet.ai/deployment-id: "abc123"

@@ -14,11 +14,27 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- /* Only emit tls entries that actually name a secret — an entry without one
+         is invalid, and the Rancher questions leave secretName empty for plain HTTP. */}}
+  {{- $tls := list }}
+  {{- range .Values.ingress.tls }}
+    {{- if .secretName }}
+    {{- $tls = append $tls . }}
+    {{- end }}
+  {{- end }}
+  {{- if $tls }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range $tls }}
+      {{- $hosts := .hosts }}
+      {{- if not $hosts }}
+      {{- /* No explicit tls hosts: cover every host declared on the ingress. */}}
+      {{- $hosts = list }}
+      {{- range $.Values.ingress.hosts }}
+      {{- $hosts = append $hosts .host }}
+      {{- end }}
+      {{- end }}
     - hosts:
-        {{- range .hosts }}
+        {{- range $hosts }}
         - {{ . | quote }}
         {{- end }}
       secretName: {{ .secretName }}

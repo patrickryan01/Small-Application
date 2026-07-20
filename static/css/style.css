@@ -1,8 +1,6 @@
 /* EmberBurn Web UI Styles — Embernet Industrial Design System */
 /* Migrated from fire/orange theme to Embernet red palette */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 * {
     margin: 0;
     padding: 0;
@@ -10,6 +8,11 @@
 }
 
 :root {
+    /* Typography — no external font fetches. EmberBurn runs in air-gapped
+       clusters where fonts.googleapis.com is unreachable. */
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+
     /* Primary */
     --ember-red: #E31837;
     --ember-red-hover: #c21530;
@@ -40,7 +43,7 @@
 }
 
 body {
-    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-ui);
     background: var(--portal-bg);
     color: var(--text-main);
     min-height: 100vh;
@@ -487,7 +490,7 @@ td.loading {
     border-radius: 4px;
     color: var(--text-main);
     font-size: 14px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
 }
 
 .form-input:focus,
@@ -589,4 +592,74 @@ td.loading {
     .main-content {
         padding: 15px;
     }
+}
+
+/* ── Modals ─────────────────────────────────────────────────────────────── */
+/* Shared by the Tag Generator and Config pages. These used to live inline in
+   tag_generator.html, which meant any other page using .modal-overlay rendered
+   completely unstyled. */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 25px;
+    width: 90%;
+    max-width: 650px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    color: var(--ember-red);
+    font-size: 1.3em;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Scrollable log output inside the Config page's log viewer. */
+.logs-output {
+    background: var(--portal-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+    max-height: 55vh;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-main);
+    white-space: pre-wrap;
+    word-break: break-word;
 }

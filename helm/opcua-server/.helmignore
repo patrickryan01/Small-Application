@@ -16,3 +16,22 @@
 .idea/
 *.tmproj
 .vscode/
+
+# Debug / lint artifacts — never ship these
+debug_output.txt
+debug_output_2.txt
+lint_output.txt
+
+# Internal development docs. Deliberately KEEPS app-readme.md (required by the
+# Rancher app catalog) and README.md (conventional for a packaged chart).
+ADD-TO-PYTHON-REPO.md
+ARM64_IMPLEMENTATION_SUMMARY.md
+ARM64_QUICK_SUMMARY.md
+DEPLOYMENT_CHECKLIST.md
+DEPLOYMENT_SUMMARY.md
+DOCKER-BUILD-GUIDE.md
+DOCUMENTATION_INDEX.md
+MULTI_TENANT_NOTES.md
+PACKAGING_GUIDE.md
+QUICKSTART.md
+RANCHER_APP_STORE_GUIDE.md

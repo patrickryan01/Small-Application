@@ -5,6 +5,8 @@ This file enables GitHub dependency detection and security scanning.
 
 from setuptools import setup, find_packages
 
+from version import __version__
+
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
@@ -13,7 +15,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="emberburn",
-    version="4.0.7",
+    version=__version__,
     author="Patrick Ryan",
     author_email="patrick@fireball-industries.com",
     description="Multi-Protocol Industrial IoT Gateway with OPC UA Server",

@@ -15,7 +15,11 @@ metadata:
 spec:
   strategy:
     type: Recreate
+  {{- /* Omit replicas when the HPA owns this Deployment, otherwise every
+         helm upgrade resets the replica count the autoscaler just set. */}}
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.pod.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "emberburn.selectorLabels" . | nindent 6 }}
@@ -27,12 +31,21 @@ spec:
         {{- if .Values.embernet.device }}
         embernet.ai/device: {{ .Values.embernet.device | quote }}
         {{- end }}
+        # Injected by the dashboard at deploy time (store.go:1304-1315). Without
+        # these the pod carries no embernet.ai/tenant, so POD SHELL returns 403
+        # "belongs to another tenant" (shell.go:602-615).
+        {{- with .Values.tenantLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.pod.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
         checksum/tags: {{ include (print $.Template.BasePath "/configmap-tags.yaml") . | sha256sum }}
         checksum/publishers: {{ include (print $.Template.BasePath "/configmap-publishers.yaml") . | sha256sum }}
+        # Read from pod annotations too, not just the Service — setting it only
+        # on the Service leaves node cards showing a generic glyph.
+        embernet.ai/app-icon: {{ include "emberburn.appIcon" . | quote }}
         {{- if .Values.embernet.displayName }}
         embernet.ai/display-name: {{ .Values.embernet.displayName | quote }}
         {{- end }}
@@ -96,6 +109,35 @@ spec:
           value: {{ .Values.emberburn.opcua.namespace | quote }}
         - name: OPC_DEVICE_NAME
           value: {{ .Values.emberburn.opcua.deviceName | quote }}
+        # ── REST API security ──
+        - name: EMBERBURN_UI_WRITES
+          value: {{ .Values.security.uiWrites | quote }}
+        - name: EMBERBURN_CORS_ORIGINS
+          value: {{ join "," .Values.security.corsOrigins | quote }}
+        - name: EMBERBURN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "emberburn.secretName" . }}
+              key: apiKey
+              optional: true
+        # ── OPC UA security (opt-in; breaks anonymous clients when enabled) ──
+        - name: OPC_SECURITY_ENABLED
+          value: {{ .Values.security.opcua.enabled | quote }}
+        - name: OPC_ALLOW_ANONYMOUS
+          value: {{ .Values.security.opcua.allowAnonymous | quote }}
+        {{- if .Values.security.opcua.enabled }}
+        - name: OPC_CERT_FILE
+          value: {{ .Values.security.opcua.certFile | quote }}
+        - name: OPC_KEY_FILE
+          value: {{ .Values.security.opcua.keyFile | quote }}
+        {{- end }}
+        {{- if not .Values.security.opcua.allowAnonymous }}
+        - name: OPC_USERS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "emberburn.secretName" . }}
+              key: opcuaUsers
+        {{- end }}
         volumeMounts:
         {{- if .Values.persistence.enabled }}
         - name: data

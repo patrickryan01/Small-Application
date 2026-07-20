@@ -1,26 +1,17 @@
 questions:
-# Namespace Configuration
-- variable: namespace.name
-  label: Namespace
-  description: "Kubernetes namespace for EmberBurn deployment"
-  type: string
-  default: "emberburn"
-  required: true
-  group: "Namespace Settings"
-
-- variable: namespace.create
-  label: Create Namespace
-  description: "Create the namespace if it doesn't exist"
-  type: boolean
-  default: true
-  group: "Namespace Settings"
+# NOTE: The namespace is NOT chart-managed. Install with:
+#   helm install <release> ./chart -n <namespace> --create-namespace
+# Rancher supplies the target namespace itself, so there are no namespace questions here.
 
 # EmberBurn Configuration
 - variable: emberburn.image.tag
   label: EmberBurn Version
   description: "EmberBurn version to deploy"
   type: string
-  default: "1.0.0"
+  # Must match values.yaml emberburn.image.tag. Rancher renders this default
+  # into the install, so a stale value here ships a bad tag on the catalog path
+  # even when values.yaml is correct.
+  default: "4.1.9"
   required: true
   group: "EmberBurn Settings"
 
@@ -111,9 +102,9 @@ questions:
 # Web UI Service Configuration
 - variable: service.webui.type
   label: Web UI Service Type
-  description: "How to expose the EmberBurn Web UI"
+  description: "How to expose the EmberBurn Web UI. Keep ClusterIP unless you need direct external access — the Embernet dashboard proxy requires ClusterIP networking."
   type: enum
-  default: "LoadBalancer"
+  default: "ClusterIP"
   required: true
   group: "Service & Networking"
   options:
@@ -161,9 +152,9 @@ questions:
   subquestions:
     - variable: ingress.className
       label: Ingress Class
-      description: "Ingress controller to use (e.g., nginx, traefik)"
+      description: "Ingress controller to use (e.g., traefik, nginx)"
       type: string
-      default: "nginx"
+      default: "traefik"
     
     - variable: ingress.hosts[0].host
       label: Hostname
@@ -172,18 +163,19 @@ questions:
       default: "emberburn.local"
       required: true
     
-    - variable: ingress.tls[0].enabled
-      label: Enable TLS/SSL
-      description: "Enable HTTPS with TLS certificate"
-      type: boolean
-      default: false
-    
+    # TLS is enabled by supplying a secret name. Leave the secret name empty to
+    # serve plain HTTP — the ingress template skips any tls entry without one.
     - variable: ingress.tls[0].secretName
       label: TLS Secret Name
-      description: "Name of secret containing TLS certificate"
+      description: "Name of the existing secret containing the TLS certificate. Leave empty to serve HTTP only."
       type: secret
-      default: "emberburn-tls"
-      show_if: "ingress.tls[0].enabled=true"
+      default: ""
+
+    - variable: ingress.tls[0].hosts[0]
+      label: TLS Hostname
+      description: "Hostname covered by the TLS certificate. Must match the hostname above."
+      type: hostname
+      default: "emberburn.local"
 
 # Protocol Configuration
 - variable: config.publishers.mqtt.enabled
@@ -196,11 +188,11 @@ questions:
   subquestions:
     - variable: config.publishers.mqtt.broker
       label: MQTT Broker Address
-      description: "MQTT broker hostname or IP (e.g., mosquitto.default.svc.cluster.local)"
+      description: "MQTT broker hostname or IP (e.g., mosquitto-mqtt-pod)"
       type: string
-      default: "mosquitto.default.svc.cluster.local"
+      default: "mosquitto-mqtt-pod"
       required: true
-    
+
     - variable: config.publishers.mqtt.port
       label: MQTT Port
       description: "MQTT broker port"
@@ -224,9 +216,9 @@ questions:
   subquestions:
     - variable: config.publishers.influxdb.url
       label: InfluxDB URL
-      description: "InfluxDB server URL (e.g., http://influxdb.default.svc.cluster.local:8086)"
+      description: "InfluxDB server URL (e.g., http://influxdb-pod:8086)"
       type: string
-      default: "http://influxdb.default.svc.cluster.local:8086"
+      default: "http://influxdb-pod:8086"
       required: true
     
     - variable: config.publishers.influxdb.bucket
@@ -254,7 +246,7 @@ questions:
       label: MQTT Broker Address
       description: "MQTT broker for Sparkplug B"
       type: string
-      default: "mosquitto.default.svc.cluster.local"
+      default: "mosquitto-mqtt-pod"
       required: true
     
     - variable: config.publishers.sparkplug.group_id
