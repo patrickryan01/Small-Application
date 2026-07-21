@@ -212,13 +212,11 @@ Credentials come from a Helm-managed Secret, or point `security.existingSecret` 
 
 Still not a hardened appliance. It's a simulator that grew up in public. But "no auth whatsoever" is no longer the answer to "how is this secured."
 
-**There was one unfixable CVE. We fixed it anyway.** `CVE-2022-25304` in the `opcua` library: a client opens a session, streams unlimited chunks, never sends the final closing chunk, and eats all your memory. Unauthenticated DoS. There is no patched release and there never will be — it affects **every** version of `opcua` *and* every version of its successor `asyncua`. Nothing to upgrade to.
+**The OPC UA listener got resource bounds, too.** A protocol server that accepts whatever a client feels like sending is a protocol server that eventually meets a client who sends too much. Message reassembly is capped now, a client that blows past the cap loses its channel and nobody else notices, and there's a test that proves the cap actually engages instead of just existing in a config file I feel good about. Defaults are generous — you'd have to be doing something genuinely unhinged with your address space to notice, and if you are, it's tunable.
 
-But the library is pure Python and we own the process, so the "unfixable" part turned out to be a matter of whose problem it is. The bug is literally that `SecureConnection._incoming_parts` is a plain list that only gets cleared when a Final chunk arrives. `apply_chunk_limits()` in `opcua_server.py` caps it — both chunk count and total bytes — and raises `UaError` when a client blows past, which the library already handles by tearing down that channel. One abusive client loses its connection. Everyone else keeps getting data.
+Belt and braces regardless: the chart's NetworkPolicy keeps 4840 inside the cluster and the pod memory limits mean the worst day is a restart. **Still don't put 4840 on an untrusted network.** It's an industrial protocol from an era that assumed the network was a friend.
 
-`test_chunk_limits.py` proves it, and it proves it *honestly*: it first drives the **unpatched** library and shows it happily retaining 5000 chunks, then installs the guard and shows the flood cut off at the limit, then confirms legitimate multi-chunk messages still assemble fine. Tune with `OPC_MAX_CHUNKS` / `OPC_MAX_MESSAGE_BYTES` if your address space is enormous.
-
-Belt and braces: the chart's NetworkPolicy still keeps 4840 inside the cluster and pod memory limits still cap the worst case at a restart. **Still don't put 4840 on an untrusted network.** And dependency CVEs now fail CI (`.github/workflows/security-audit.yml`, weekly plus on every `requirements.txt` change) rather than waiting for me to remember — which is how the two transitive ones (`click`, `cryptography`) sat there unnoticed until 4.1.9.
+And dependency CVEs now fail CI — `.github/workflows/security-audit.yml`, on every `requirements.txt` change plus weekly, because a vulnerability published against a pin I haven't touched in six months is exactly the one I'd never look for. This is not hypothetical: two transitive ones sat in this repo unnoticed until 4.1.9, entirely because nothing was checking and I am not a person who checks.
 
 ## Environment Variables
 
