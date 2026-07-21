@@ -1,5 +1,22 @@
 # Embernet Helm Chart Compatibility Requirements
 
+> ## ⚠️ PARTIALLY SUPERSEDED — verify against the source-derived contract
+>
+> The **EmberNET App Store Chart Contract** (generated 2026-07-19 against dashboard
+> v4.1.34, derived from the dashboard Go source rather than from documentation) is
+> authoritative where the two disagree. Known incorrect claims in this document:
+>
+> | This document says | The code actually does |
+> |---|---|
+> | `embernet.ai/app-icon` is a **label**, resolved from `pod.Labels` (§2, §7, §11) | It is an **annotation**, read at `client.go:307-309` from **both** pod and Service annotations. Service-only leaves node cards showing a generic glyph |
+> | Icon value is an "emoji or icon identifier" | Annotation values have no charset restriction, so a URL or `data:` URI is legal — and necessary, since a label value cannot contain `/` or `:` |
+> | `embernet.ai/tenant` is not listed as required | It is **mandatory**. Injected via `.Values.tenantLabels`; a chart that drops it has its Services filtered out of every tenant-scoped view (`services.go:226`) and POD SHELL returns 403 (`shell.go:602-615`) |
+> | `gui-type: "web+shell"` is a valid value | Rejected by kube-apiserver — `+` is not in the K8s label-value character class |
+>
+> Following this document's icon guidance is what produced the broken app tile
+> fixed in EmberBurn v4.1.9. Treat the sections below as historical context and
+> confirm anything load-bearing against the contract before relying on it.
+
 > **What every Helm chart published to the Embernet ecosystem must include to work with the Industrial Dashboard.**
 
 This document specifies the labels, annotations, values, and structural requirements that **all application Helm charts** (Node-RED, Grafana, PostgreSQL, Mosquitto, etc.) must follow to be fully compatible with the Embernet Industrial Dashboard's discovery engine, App Store, shell access, and digital twin mapping.

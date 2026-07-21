@@ -11,7 +11,7 @@ questions:
   # Must match values.yaml emberburn.image.tag. Rancher renders this default
   # into the install, so a stale value here ships a bad tag on the catalog path
   # even when values.yaml is correct.
-  default: "4.1.10"
+  default: "4.1.11"
   required: true
   group: "EmberBurn Settings"
 

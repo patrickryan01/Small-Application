@@ -5,6 +5,62 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.11] - 2026-07-21 — Release Process Repair
+
+4.1.9 and 4.1.10 were cut without following `RELEASE_CHECKLIST.md`. Four gates were
+missed. Three of them were missed because the checklist itself was wrong, so this
+release fixes the checklist rather than just the symptoms.
+
+### Fixed — RELEASE_CHECKLIST.md
+
+- **§1/§8 remote names:** the checklist said `embernet` = org repo and `origin` =
+  personal fork. This clone has `origin` = org repo and `upstream` = personal fork —
+  the reverse. Every push instruction pointed at the wrong name. Now says to check
+  `git remote -v` and go by URL, with a corrected remotes table. This is how the
+  fork silently drifted 17 commits behind between v4.0.8 and v4.1.10.
+- **§8 push order was actively dangerous:** it said `git push embernet main --tags`,
+  pushing the chart bump and the tag in one shot. `release.yml` publishes the chart
+  on push-to-main while `docker-publish.yml` only builds on a `v*` tag, so that
+  ordering races them and can publish a chart referencing an image that does not
+  exist — which is exactly what the v4.0.9 ImagePullBackOff was. Replaced with the
+  branch → tag → **wait for image** → merge → sync-fork sequence that the guard
+  added in 4.1.9 actually enforces.
+- **§7 was self-contradictory:** it required both adding and removing the current
+  version's entry in `RELEASE_NOTES.md`. Clarified: release notes lag one version
+  behind because the version in your tree has not shipped yet; `CHANGELOG.md`
+  carries the current version and is not subject to the lag.
+- **§9 GitHub Release was marked "if desired"** and was consequently skipped for
+  every release from v4.0.8 to v4.1.10 — eight versions where tags and images
+  published but the Releases page stayed at v4.0.7. Now mandatory, with the command.
+- **§4a `app-name` expected value** was `"emberburn"`; the chart has emitted
+  `"EmberBurn"` since v4.1.7.
+- **§4e added — tenant labels.** The gate that would have caught the customer-visible
+  bug fixed in 4.1.9, with a one-line command that asserts all four renders.
+- **§4f added — app icon.** Records that `app-icon` must be an annotation rather than
+  a label (label values cannot contain `/` or `:`) and must not be an external URL.
+- **§5 added — the two new test gates.** `test_chunk_limits.py` and
+  `test_sparkplug.py`. The chunk-limit test matters most: it guards a monkeypatch of
+  a private python-opcua method, which a dependency bump can silently un-apply.
+
+### Fixed — documentation/HELM_CHART_REQUIREMENTS (1).md
+
+- Added a supersession banner. Its claim that `embernet.ai/app-icon` resolves from
+  `pod.Labels` is wrong — the dashboard reads it as an **annotation** from both pod
+  and Service (`client.go:307-309`). Following this document is what produced the
+  broken app tile fixed in 4.1.9. Also corrects its omission of the mandatory
+  `embernet.ai/tenant` label and its listing of `web+shell`, which kube-apiserver
+  rejects. `.agent/APP_STORE_DEPLOYMENT_FLOW.md`, cited by v4.1.8 as requiring a
+  full icon URL, does not exist in this repository at all.
+
+### Notes
+
+- No application code changed in this release. Chart contents are identical to
+  4.1.10 apart from the version strings.
+- **Chart version**: `4.1.11`, appVersion: `4.1.11`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.1.11`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.1.11.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.1.11` tag
+
 ## [4.1.10] - 2026-07-20 — Mitigate CVE-2022-25304, Audit Dependencies in CI
 
 4.1.9 shipped with a known-unfixed CVE documented in `requirements.txt` and a
