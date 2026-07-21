@@ -5,6 +5,53 @@ All notable changes to EmberBurn Industrial IoT Gateway will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.10] - 2026-07-20 — Mitigate CVE-2022-25304, Audit Dependencies in CI
+
+4.1.9 shipped with a known-unfixed CVE documented in `requirements.txt` and a
+note telling operators to keep port 4840 off untrusted networks. Documenting a
+vulnerability is not fixing it. The library is pure Python and we own the
+process, so "unfixable upstream" turned out to mean "somebody else's problem
+unless we make it ours."
+
+### Added
+
+- **opcua_server.py:** `apply_chunk_limits()` mitigates CVE-2022-25304 in-process.
+  python-opcua accumulates incoming chunks in `SecureConnection._incoming_parts`,
+  a plain list cleared only when a Final or Abort chunk arrives — so a client can
+  stream unlimited Intermediate chunks and never terminate the message. The guard
+  caps both chunk count and total bytes per message and raises `UaError` past the
+  limit, which the library already handles by tearing down that channel. One
+  abusive client loses its connection; the server keeps serving everyone else.
+  Applied in `create_server()` before any client can connect. Tunable via
+  `OPC_MAX_CHUNKS` (default 512) and `OPC_MAX_MESSAGE_BYTES` (default 16 MiB).
+- **opcua_server.py:** the guard reports failure loudly if python-opcua's
+  internals move, so a lapsed mitigation is visible rather than silently assumed.
+- **test_chunk_limits.py:** new. Drives the **unguarded** library first and
+  demonstrates it retaining 5000 chunks — proving the vulnerability is real —
+  then installs the guard and asserts the flood is cut off at the limit, the
+  buffer is released, the byte cap trips independently of the chunk cap,
+  legitimate multi-chunk messages still assemble, and the byte counter does not
+  leak between messages.
+- **.github/workflows/security-audit.yml:** new. `pip-audit` on every
+  `requirements.txt` change, on PRs, and weekly on a schedule so a CVE published
+  against an unchanged pin still surfaces. Runs `--strict`, and also executes
+  `test_chunk_limits.py` to confirm the opcua mitigation is still wired.
+  PYSEC-2026-888 is explicitly ignored — it has no fixed version and is mitigated
+  in-process — which keeps the gate meaningful: any *other* vulnerability fails
+  the build. 4.1.9's two transitive CVEs sat unnoticed precisely because nothing
+  was checking.
+
+### Notes
+
+- `paho-mqtt` remains pinned `<2` because `pysparkplug` requires it. Verified
+  `paho-mqtt` 1.6.1 has **zero** known vulnerabilities, so this is a maintenance
+  constraint rather than a security one. Revisit if pysparkplug adds paho 2
+  support.
+- **Chart version**: `4.1.10`, appVersion: `4.1.10`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.1.10`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.1.10.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.1.10` tag
+
 ## [4.1.9] - 2026-07-20 — App Store Contract, Air-Gapped Icons, Working Writes, 15/15 Protocols
 
 Audited the chart against the EmberNET App Store contract — the version generated

@@ -212,9 +212,13 @@ Credentials come from a Helm-managed Secret, or point `security.existingSecret` 
 
 Still not a hardened appliance. It's a simulator that grew up in public. But "no auth whatsoever" is no longer the answer to "how is this secured."
 
-**One known unfixed CVE, and I'm telling you about it rather than hoping you don't run `pip-audit`.** `CVE-2022-25304` in the `opcua` library: a client can open a session and stream unlimited huge chunks without ever sending the final closing chunk, and eat all your memory. It's an unauthenticated DoS. There is no patched release — it affects **every** version of `opcua` *and* every version of its successor `asyncua`, so there's nothing to upgrade to.
+**There was one unfixable CVE. We fixed it anyway.** `CVE-2022-25304` in the `opcua` library: a client opens a session, streams unlimited chunks, never sends the final closing chunk, and eats all your memory. Unauthenticated DoS. There is no patched release and there never will be — it affects **every** version of `opcua` *and* every version of its successor `asyncua`. Nothing to upgrade to.
 
-What's in place instead: the chart's NetworkPolicy keeps 4840 inside the cluster, and the pod memory limits mean the worst case is a pod restart rather than a dead node. **Don't put port 4840 on an untrusted network.** Dependencies are audited with `pip-audit -r requirements.txt`; the two transitive CVEs it also found (`click`, `cryptography`) are pinned out in `requirements.txt`.
+But the library is pure Python and we own the process, so the "unfixable" part turned out to be a matter of whose problem it is. The bug is literally that `SecureConnection._incoming_parts` is a plain list that only gets cleared when a Final chunk arrives. `apply_chunk_limits()` in `opcua_server.py` caps it — both chunk count and total bytes — and raises `UaError` when a client blows past, which the library already handles by tearing down that channel. One abusive client loses its connection. Everyone else keeps getting data.
+
+`test_chunk_limits.py` proves it, and it proves it *honestly*: it first drives the **unpatched** library and shows it happily retaining 5000 chunks, then installs the guard and shows the flood cut off at the limit, then confirms legitimate multi-chunk messages still assemble fine. Tune with `OPC_MAX_CHUNKS` / `OPC_MAX_MESSAGE_BYTES` if your address space is enormous.
+
+Belt and braces: the chart's NetworkPolicy still keeps 4840 inside the cluster and pod memory limits still cap the worst case at a restart. **Still don't put 4840 on an untrusted network.** And dependency CVEs now fail CI (`.github/workflows/security-audit.yml`, weekly plus on every `requirements.txt` change) rather than waiting for me to remember — which is how the two transitive ones (`click`, `cryptography`) sat there unnoticed until 4.1.9.
 
 ## Environment Variables
 

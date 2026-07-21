@@ -1,5 +1,42 @@
 # EmberBurn Release Notes
 
+## v4.1.10 — 2026-07-20
+
+### Actually Fixing The CVE Instead Of Documenting It
+
+4.1.9 shipped a known-unfixed CVE with a note saying "keep 4840 off untrusted
+networks." That is not a fix, it is a disclaimer.
+
+- **Root cause**: CVE-2022-25304 — python-opcua accumulates incoming chunks in
+  `SecureConnection._incoming_parts`, a plain list that is only cleared when a
+  Final or Abort chunk arrives. A client opens a session, streams unlimited
+  Intermediate chunks, never terminates the message, and the process dies.
+  Unauthenticated. Affects every version of `opcua` and of its successor
+  `asyncua`, so there is nothing to upgrade to
+- **Fixed** — `apply_chunk_limits()` in `opcua_server.py` caps chunk count and
+  total bytes per message and raises `UaError` past the limit, which python-opcua
+  already handles by tearing down that channel. One abusive client loses its
+  connection; everyone else keeps getting data. The library is pure Python and we
+  own the process, so "unfixable upstream" only meant nobody had made it their
+  problem. Tunable via `OPC_MAX_CHUNKS` / `OPC_MAX_MESSAGE_BYTES`
+- **Added** `test_chunk_limits.py`, which proves it honestly: it drives the
+  **unpatched** library first and shows it retaining 5000 chunks, then installs
+  the guard and shows the flood cut off at the limit, then confirms legitimate
+  multi-chunk messages still assemble
+- **Added** `.github/workflows/security-audit.yml` — `pip-audit --strict` on every
+  requirements change, on PRs, and weekly so a CVE published against an unchanged
+  pin still surfaces. It also runs the chunk-limit test, so if the mitigation ever
+  stops being wired the build says so. 4.1.9's two transitive CVEs went unnoticed
+  because nothing was checking
+- **Note**: `paho-mqtt` stays pinned `<2` for `pysparkplug`. Confirmed 1.6.1 has
+  zero known vulnerabilities — a maintenance constraint, not a security one
+- **Chart version**: `4.1.10`, appVersion: `4.1.10`
+- Image tag: `ghcr.io/embernet-ai/emberburn:4.1.10`
+- Helm chart: `https://embernet-ai.github.io/Emberburn/emberburn-4.1.10.tgz`
+- Multi-arch build (amd64/arm64) via GitHub Actions on `v4.1.10` tag
+
+---
+
 ## v4.1.9 — 2026-07-20
 
 ### The Icons Never Loaded, The Writes Never Worked, GraphQL And Sparkplug Never Started

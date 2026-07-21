@@ -19,6 +19,83 @@ from datetime import datetime
 from pathlib import Path
 from publishers import PublisherManager
 
+logger = logging.getLogger("OPCUAServer")
+
+# Defaults are generous for a tag gateway — a browse response is a handful of
+# chunks — while still bounding memory well under any sane pod limit.
+DEFAULT_MAX_CHUNKS = 512
+DEFAULT_MAX_MESSAGE_BYTES = 16 * 1024 * 1024
+
+
+def apply_chunk_limits(max_chunks: int = DEFAULT_MAX_CHUNKS,
+                       max_message_bytes: int = DEFAULT_MAX_MESSAGE_BYTES) -> bool:
+    """
+    Bound OPC UA message reassembly to mitigate CVE-2022-25304.
+
+    python-opcua accumulates incoming chunks in SecureConnection._incoming_parts,
+    a plain list that is only cleared when a Final or Abort chunk arrives. A
+    client can therefore open a session and stream unlimited Intermediate chunks
+    without ever terminating the message, and the server grows until it dies.
+
+    The CVE affects every released version of `opcua` and of its successor
+    `asyncua`, so there is no upgrade that fixes it. Since the library is pure
+    Python and we own the process, cap it here instead: refuse a message once it
+    exceeds either limit and raise UaError, which python-opcua already handles by
+    tearing down the offending channel. One abusive client loses its connection;
+    the server keeps serving everyone else.
+
+    Returns True if the guard was installed. Returns False — loudly — if the
+    library internals have moved, so a silent lapse in the mitigation is visible
+    rather than assumed.
+    """
+    try:
+        from opcua import ua
+        from opcua.common.connection import SecureConnection
+    except Exception as e:
+        logger.error(f"Cannot apply OPC UA chunk limits, import failed: {e}")
+        return False
+
+    if getattr(SecureConnection, "_emberburn_chunk_guard", False):
+        return True
+
+    original_receive = getattr(SecureConnection, "_receive", None)
+    if original_receive is None:
+        logger.error(
+            "Cannot apply OPC UA chunk limits: SecureConnection._receive is gone. "
+            "CVE-2022-25304 is UNMITIGATED — keep port 4840 off untrusted networks."
+        )
+        return False
+
+    def guarded_receive(self, msg):
+        # Byte total is tracked incrementally; summing the list on every chunk
+        # would make reassembly quadratic.
+        pending = len(self._incoming_parts)
+        accumulated = getattr(self, "_emberburn_pending_bytes", 0)
+        accumulated += len(getattr(msg, "Body", b"") or b"")
+
+        if pending >= max_chunks or accumulated > max_message_bytes:
+            self._incoming_parts = []
+            self._emberburn_pending_bytes = 0
+            raise ua.UaError(
+                f"Message exceeds limits ({pending + 1} chunks, {accumulated} bytes; "
+                f"max {max_chunks} chunks, {max_message_bytes} bytes) — "
+                "closing channel (CVE-2022-25304 guard)"
+            )
+
+        result = original_receive(self, msg)
+
+        # _receive clears _incoming_parts once a message completes or aborts.
+        self._emberburn_pending_bytes = accumulated if self._incoming_parts else 0
+        return result
+
+    SecureConnection._receive = guarded_receive
+    SecureConnection._emberburn_chunk_guard = True
+    logger.info(
+        f"OPC UA chunk limits applied: max {max_chunks} chunks, "
+        f"{max_message_bytes} bytes per message (CVE-2022-25304 mitigation)"
+    )
+    return True
+
 
 class OPCUAServer: 
     """
@@ -267,8 +344,16 @@ class OPCUAServer:
         Returns:
             int:  Namespace index
         """
+        # Must run before any client can connect.
+        apply_chunk_limits(
+            max_chunks=int(os.getenv('OPC_MAX_CHUNKS', DEFAULT_MAX_CHUNKS)),
+            max_message_bytes=int(
+                os.getenv('OPC_MAX_MESSAGE_BYTES', DEFAULT_MAX_MESSAGE_BYTES)
+            ),
+        )
+
         self.server = Server()
-        
+
         # Server endpoint configuration
         endpoint = os.getenv('OPC_ENDPOINT', 'opc.tcp://0.0.0.0:4840/freeopcua/server/')
         self.server.set_endpoint(endpoint)

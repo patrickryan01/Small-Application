@@ -1,0 +1,57 @@
+name: Security Audit
+
+# Dependency CVEs should fail a build, not wait for someone to run pip-audit by
+# hand. 4.1.9 shipped with two transitive CVEs (click, cryptography) that nobody
+# had looked for.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'requirements.txt'
+      - '.github/workflows/security-audit.yml'
+  pull_request:
+    paths:
+      - 'requirements.txt'
+  schedule:
+    # Weekly, so a CVE published against a pinned dependency surfaces even when
+    # nothing in the repo changes.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install --upgrade pip pip-audit
+
+      # CVE-2022-25304 in `opcua` has no fixed release — it affects every version
+      # of `opcua` and of its successor `asyncua`. It is mitigated in-process by
+      # apply_chunk_limits() in opcua_server.py, which bounds message reassembly,
+      # and verified by test_chunk_limits.py. Ignoring it here keeps the audit
+      # meaningful: any OTHER vulnerability fails the build.
+      #
+      # Re-check periodically — if upstream ever ships a fix, drop the ignore.
+      - name: Audit dependencies
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln PYSEC-2026-888 \
+            --ignore-vuln GHSA-mfpj-3qhm-976m \
+            --progress-spinner off \
+            --strict
+
+      - name: Confirm the opcua mitigation is still wired
+        run: |
+          pip install -r requirements.txt
+          python test_chunk_limits.py

@@ -1,11 +1,16 @@
-# KNOWN UNFIXED: CVE-2022-25304 / PYSEC-2026-888 — unauthenticated DoS. A client
-# can open a session and stream unlimited huge chunks without ever sending the
-# final closing chunk, exhausting memory. It affects ALL versions of `opcua` AND
-# of its successor `asyncua`, so there is no upgrade that resolves it.
+# CVE-2022-25304 / PYSEC-2026-888 — unauthenticated DoS. A client can open a
+# session and stream unlimited chunks without ever sending the final closing
+# chunk, exhausting memory. It affects ALL versions of `opcua` AND of its
+# successor `asyncua`, so there is no upgrade that resolves it.
 #
-# Mitigations already in the chart: the NetworkPolicy restricts 4840 to the
-# cluster, and pod memory limits bound the blast radius to a pod restart rather
-# than a node. Do not expose 4840 to an untrusted network.
+# MITIGATED IN-PROCESS: apply_chunk_limits() in opcua_server.py bounds message
+# reassembly (chunk count and total bytes) and tears down the offending channel
+# instead of growing without limit. Verified by test_chunk_limits.py, which first
+# demonstrates the unguarded library retaining 5000 chunks. Tunable via
+# OPC_MAX_CHUNKS / OPC_MAX_MESSAGE_BYTES.
+#
+# Defence in depth: the chart's NetworkPolicy also restricts 4840 to the cluster
+# and pod memory limits cap the blast radius at a restart.
 opcua>=0.98.0
 # Upper bound is load-bearing: pysparkplug requires paho-mqtt<2, and paho 2.x
 # changed the callback API (CallbackAPIVersion). Unbounded, a fresh install
